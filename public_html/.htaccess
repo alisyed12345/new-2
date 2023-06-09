@@ -3,7 +3,7 @@ RewriteBase /
 
 RewriteEngine On
 
-ErrorDocument 404 https://localhost:8095/404.php
+ErrorDocument 404 https://localhost:8096/404.php
 
 #TO STOP DIRECTORY INDEXING
 Options -Indexes 
