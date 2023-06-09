@@ -1,0 +1,73 @@
+<?php
+include_once "../includes/config.php";
+if($_GET['action'] == 'list_sms_template'){ 
+ 
+        $finalAry = array();
+        $sms_temp =$db->get_results("SELECT s.id, st.type_name, st.status, s.sms_text, s.sms_template_id, (CASE WHEN s.status=1 THEN 'Active' ELSE 'Inactive' END) AS is_active FROM ss_sms_templates s INNER JOIN ss_sms_template_types st ON s.sms_template_id = st.id where st.status = 1  ORDER BY id DESC",ARRAY_A);
+        
+        for($i=0; $i<count($sms_temp); $i++){
+            $sms_temp[$i]['sms_text'] = $sms_temp[$i]['sms_text'];
+        }
+        $finalAry['data'] = $sms_temp;
+        echo json_encode($finalAry);
+        exit;
+}
+elseif($_POST['action'] == 'message_template_add'){
+    $sms_template_id = $_POST['sms_template_id'];
+    $sms_text = $_POST['sms_text'];
+    $db->query("update ss_sms_templates set status = 0,  updated_on='".date('Y-m-d H:i:s')."' where sms_template_id = '".$sms_template_id."'");
+    $sms_temp = $db->query("insert into ss_sms_templates set sms_template_id='".$sms_template_id."', sms_text='".$sms_text."', status = '".$_POST['status']."', updated_by_user_id='".$_SESSION['icksumm_uat_login_userid']."'");
+    
+    $sms_temp_id = $db->insert_id;
+                    
+    if($sms_temp_id > 0){
+       
+        echo json_encode(array('code' => "1",'msg' => "Record  added successfully"));
+        exit;
+    }else{
+        $return_resp = array('code' => "0",'msg' => 'Record  not added');
+        CreateLog($_REQUEST, json_encode($return_resp));
+        echo json_encode($return_resp);
+        exit;
+    }
+}
+elseif($_POST['action'] == 'message_template_edit'){
+    $temp_sms_id = $_POST['msg_temp_id'];
+    $sms_template_id = $_POST['sms_template_id'];
+    $sms_text = $_POST['sms_text'];
+   
+    if($temp_sms_id){
+        $db->query("update ss_sms_templates set status = 0,  updated_on='".date('Y-m-d H:i:s')."' where sms_template_id = '".$sms_template_id."'");
+        $edit_sms_template = $db->query("update ss_sms_templates set sms_template_id='".$sms_template_id."',  
+		sms_text='".$sms_text."',  status='".$_POST['status']."', updated_by_user_id='".$_SESSION['icksumm_uat_login_userid']."', updated_on='".date('Y-m-d H:i:s')."' where id = '".$temp_sms_id."'");
+        echo json_encode(array('code' => "1",'msg' => "Record  Updated Successfully"));
+        exit;
+    }else{
+        $return_resp = array('code' => "0",'msg' => 'Record  Not Updated');
+        CreateLog($_REQUEST, json_encode($return_resp));
+        echo json_encode($return_resp);
+        exit;
+    }
+}
+elseif($_POST['action'] == 'delete_message_template'){
+   if(isset($_POST['id'])){
+       $rec = $db->query("DELETE FROM ss_sms_templates where id='".$_POST['id']."'");
+       
+       if($rec > 0){
+           echo json_encode(array('code' => "1",'msg' => 'Message Template Deleted successfully'));
+           exit;
+       }else{
+           $return_resp = array('code' => "0",'msg' => 'Message Template Not Deleted');
+           CreateLog($_REQUEST, json_encode($return_resp));
+           echo json_encode($return_resp);
+           exit;
+       }
+   
+   }else{
+       $return_resp = array('code' => "0",'msg' => 'Error: Process failed');
+       CreateLog($_REQUEST, json_encode($return_resp));
+       echo json_encode($return_resp);
+       exit;
+   }
+}
+?>

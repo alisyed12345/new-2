@@ -1,0 +1,484 @@
+<?php $pagename = basename($_SERVER['PHP_SELF']);
+
+$new_text_msg_rec = $db->get_var("select count(1) from ss_bulk_sms_reply where is_read = 0");
+
+//THIS IS HACK. TO DISPLAY NEW MESSAGE TO 0 ON OPENING mass_text_msg_reply PAGE, SINCE IT UPDATES AFTER DISPLAYING LEFT MENU
+if(basename($_SERVER['REQUEST_URI']) == "mass_text_msg_reply"){
+  $new_text_msg_rec = 0;
+}
+
+$role_ary_sidebar = [];
+$user_types_sidebar = $db->get_results("SELECT distinct t.id, t.user_type_group FROM ss_usertypeusermap m INNER JOIN ss_usertype t ON t.id = m.user_type_id WHERE m.user_id = '".$_SESSION['icksumm_uat_login_userid']."' ") ;
+foreach($user_types_sidebar as $utype){
+  if(!in_array($utype->user_type_group, $role_ary_sidebar)){
+    $role_ary_sidebar[$utype->id] = $utype->user_type_group; 
+  }
+}
+?>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/fontawesome.min.css"
+    integrity="sha512-OdEXQYCOldjqUEsuMKsZRj93Ht23QRlhIb8E/X0sbwZhme8eUw6g8q7AdxGJKakcBbv7+/PX0Gc2btf7Ru8cZA=="
+    crossorigin="anonymous" />
+<script src='https://kit.fontawesome.com/a076d05399.js' crossorigin='anonymous'></script>
+<div class="sidebar sidebar-main">
+    <div class="sidebar-content">
+
+        <!-- User menu -->
+        <div class="sidebar-user">
+            <div class="category-content">
+                <div class="media"> <a href="#" class="media-left"><img
+                            src="<?php echo SITEURL ?>assets/images/dummy.jpg" class="img-circle img-sm" alt=""></a>
+                    <div class="media-body"> <span
+                            class="media-heading text-semibold"><?php echo $_SESSION['icksumm_uat_login_fullname'] ?></span>
+                    </div>
+                    <div class="media-right media-middle">
+                        <ul class="icons-list">
+                            <li> <a href="<?php echo SITEURL ?>logout" title="Logout" class="logoutlink"><i
+                                        class="icon-switch2"></i></a> </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- /user menu -->
+
+        <!-- Main navigation -->
+        <div class="sidebar-category sidebar-category-visible">
+            <div class="category-content no-padding">
+                <ul class="navigation navigation-main navigation-accordion">
+                    <li class="navigation-header"><span><?php echo $_SESSION['icksumm_uat_login_usertype'] ?>
+                            <?php
+                            //COMMENTED ON 09-OCT-2020 - TEMPORARILY TO FIX ISSUE 
+                            //if($_SESSION['icksumm_uat_login_total_roles_alloted'] > 1){ 
+                            if(count($role_ary_sidebar) > 1){
+                            ?>
+                            <a href="javascript:void(0)" data-toggle="modal" data-target="#modal_switch_account"
+                                class="pull-right">
+                                <!--<i class="icon-spinner11"></i>-->Switch Account
+                            </a>
+                            <?php } ?></span>
+                        <i class="icon-menu" title="Main pages"></i>
+                    </li>
+
+                    <?php  if($_SESSION['icksumm_uat_login_usertypecode'] == 'UT01' || $_SESSION['icksumm_uat_login_usertypecode'] == 'UT02' || $_SESSION['icksumm_uat_login_usertypecode'] == 'UT04'){ ?>
+
+
+
+                    <!-- full block comment Start -->
+
+                    <li class="<?php echo ($pagename=="dashboard")?"active":"" ?>"><a
+                            href="<?php echo SITEURL ?>dashboard" class="navlink"><i class="icon-home4"></i>
+                            <span>Dashboard</span></a></li>
+
+
+                    <?php   if(in_array("su_role_list", $_SESSION['login_user_permissions']) || in_array("su_permissions_list", $_SESSION['login_user_permissions'])){  ?>
+                    <li class="<?php echo ($pagename=="role_list" || $pagename=="permission_list")?"active":"" ?>"> <a
+                            href="#"><i class="icon-users"></i> <span>Role & Permission </span></a>
+                        <ul>
+                            <?php   if(in_array("su_role_list", $_SESSION['login_user_permissions'])){  ?>
+                            <li><a href="<?php echo SITEURL ?>role/role_list"
+                                    class="navlink <?php echo $pagename=="students_list"?"active":"" ?>">Role</a></li>
+
+                            <?php }
+                     if ($_SESSION['icksumm_uat_login_usertypesubgroup'] == 'admin'){
+                     if(in_array("su_permissions_list", $_SESSION['login_user_permissions'])){
+                   
+                    ?>
+                            <li><a href="<?php echo SITEURL ?>permissions/permission_list"
+                                    class="navlink <?php echo $pagename=="family_list"?"active":"" ?>">Permission</a>
+                            </li>
+
+                            <?php } } ?>
+                        </ul>
+                    </li>
+                    <?php } ?>
+                    <?php   if(in_array("su_student_list", $_SESSION['login_user_permissions']) || in_array("su_family_list", $_SESSION['login_user_permissions'])){  ?>
+                    <li class="<?php echo ($pagename=="students_list" || $pagename=="family_list")?"active":"" ?>"> <a
+                            href="#"><i class="icon-users"></i> <span>Student &amp; Family</span></a>
+                        <ul>
+
+
+                            <?php if(in_array("su_student_list", $_SESSION['login_user_permissions'])){ ?>
+                            <li><a href="<?php echo SITEURL ?>student/students_list"
+                                    class="navlink <?php echo $pagename=="students_list"?"active":"" ?>">Student</a>
+                            </li>
+                            <?php } ?>
+
+
+                            <?php if(in_array("su_family_list", $_SESSION['login_user_permissions'])){ ?>
+                            <li><a href="<?php echo SITEURL ?>student/family_list"
+                                    class="navlink <?php echo $pagename=="family_list"?"active":"" ?>">Family View</a>
+                            </li>
+                            <?php } ?>
+
+
+                            <li><a href="<?php echo SITEURL ?>parents/add_family_student_without_payment"
+                                    class="navlink <?php echo $pagename=="add_family_student_without_payment"?"active":"" ?>">Add
+                                    New Family</a>
+                            </li>
+                        </ul>
+                    </li>
+                    <?php } ?>
+
+                    <?php   if(in_array("su_attendence_list", $_SESSION['login_user_permissions']) || in_array("su_attendence_list", $_SESSION['login_user_permissions'])){  ?>
+                    <li
+                        class="<?php echo ($pagename=="attendance_history" || $pagename=="attendance_today")?"active":"" ?>">
+                        <a href="#"><i class="icon-user-check"></i> <span>Attendance</span></a>
+                        <ul>
+
+                            <li><a href="<?php echo SITEURL ?>attendance/attendance_history"
+                                    class="navlink <?php echo $pagename=="attendance_history"?"active":"" ?>">Attendance
+                                    History</a></li>
+
+                            <li><a href="<?php echo SITEURL ?>attendance/attendance_today"
+                                    class="navlink <?php echo $pagename=="attendance_today"?"active":"" ?>">Today's
+                                    Attendance</a></li>
+
+                        </ul>
+                    </li>
+                    <?php } ?>
+
+                    <?php   if(in_array("su_admission_request_list", $_SESSION['login_user_permissions']) || in_array("su_admission_request_list", $_SESSION['login_user_permissions'])){  ?>
+                    <li
+                        class="<?php echo ($pagename=="admission_request_pending" || $pagename=="admission_request_completed")?"active":"" ?>">
+                        <a href="#"><i class="icon-user-plus"></i> <span>Admission Request</span></a>
+                        <ul>
+
+                            <li><a href="<?php echo SITEURL ?>admission_request/admission_request_pending"
+                                    class="navlink <?php echo $pagename=="admission_request_pending"?"active":"" ?>">Pending</a>
+                            </li>
+                            <li><a href="<?php echo SITEURL ?>admission_request/admission_request_completed"
+                                    class="navlink <?php echo $pagename=="admission_request_completed"?"active":"" ?>">Completed</a>
+                            </li>
+
+                        </ul>
+                    </li>
+                    <?php } ?>
+
+                    <?php   if(in_array("su_staff_list", $_SESSION['login_user_permissions']) || in_array("su_staff_create", $_SESSION['login_user_permissions'])){  ?>
+                    <li
+                        class="<?php echo ($pagename=="staffs_list" || $pagename=="staff_add" || $pagename=="staff_edit")?"active":"" ?>">
+                        <a href="#"><i class="icon-user-tie"></i> <span>Staff</span></a>
+                        <ul>
+
+                            <li><a href="<?php echo SITEURL ?>staff/staffs_list"
+                                    class="navlink <?php echo $pagename=="staffs_list"?"active":"" ?>">List All
+                                    Staffs</a></li>
+                            <li><a href="<?php echo SITEURL ?>staff/staff_add"
+                                    class="navlink <?php echo $pagename=="staff_add"?"active":"" ?>">Add New Staff</a>
+                            </li>
+
+                        </ul>
+                    </li>
+                    <?php } ?>
+
+                    <?php   if(in_array("su_classes_list", $_SESSION['login_user_permissions']) || in_array("su_classes_create", $_SESSION['login_user_permissions']) || in_array("su_group_list", $_SESSION['login_user_permissions'])){  ?>
+
+                    <li
+                        class="<?php echo ($pagename=="classes_manage" || $pagename=="classtime_list" || $pagename=="classtime_add" || $pagename=="groups_manage" || $pagename=="classtime_edit")?"active":"" ?>">
+                        <a href="#"><i class="icon-make-group"></i> <span>Group &amp; Classes</span></a>
+                        <ul>
+
+                            <li><a href="<?php echo SITEURL ?>group/classtime_list"
+                                    class="navlink <?php echo $pagename=="classtime_list"?"active":"" ?>">List Class
+                                    Time</a></li>
+
+                            <li><a href="<?php echo SITEURL ?>group/classtime_add"
+                                    class="navlink <?php echo $pagename=="classtime_add"?"active":"" ?>">Add Class
+                                    Time</a></li>
+
+                            <li><a href="<?php echo SITEURL ?>group/groups_manage"
+                                    class="navlink <?php echo $pagename=="groups_manage"?"active":"" ?>">Manage
+                                    Groups</a></li>
+
+
+                            <li><a href="<?php echo SITEURL ?>subjects/list_all_subjects"
+                                    class="navlink <?php echo $pagename=="list_all_subjects"?"active":"" ?>">Manage
+                                    Classes</a></li>
+
+                            <li><a href="<?php echo SITEURL ?>online_classes/list_online_classes"
+                                    class="navlink <?php echo $pagename=="list_online_classes"?"active":"" ?>">Manage
+                                    Online Classes</a></li>
+                        </ul>
+                    </li>
+                    <?php } ?>
+
+                    <!-- <li class="<?php echo ($pagename=="fees_list" || $pagename=="fees_add" || $pagename=="fees_edit")?"active":"" ?>"> <a href="#"><i class="icon-coins"></i> <span>Payments</span></a>
+           <ul>
+             <li><a href="<?php echo SITEURL ?>fees/fees_list" class="navlink <?php echo $pagename=="fees_list"?"active":"" ?>">List Payments</a></li>
+             <li><a href="<?php echo SITEURL ?>fees/fees_add" class="navlink <?php echo $pagename=="fees_add"?"active":"" ?>">Add Payment</a></li>
+           </ul>
+         </li> -->
+                    <?php   if(in_array("su_communicate_list", $_SESSION['login_user_permissions']) || in_array("su_communicate_send_mass_email", $_SESSION['login_user_permissions']) || in_array("su_communicate_sent_text_create", $_SESSION['login_user_permissions']) || in_array("su_communicate_recived_text_view", $_SESSION['login_user_permissions'])){  ?>
+                    <li
+                        class="<?php echo ($pagename=="message_list" || $pagename=="message_new" || $pagename=="mass_email" || $pagename=="mass_email_history" || $pagename=="mass_text_msg_history" || $pagename=="mass_text_msg_reply")?"active":"" ?>">
+                        <a href="#"><i class="icon-envelop2"></i> <span>Message</span>
+                            <?php echo $new_text_msg_rec > 0 ? '<span class="label label-warning">New</span>' : '' ?></a>
+                        <ul>
+                            <?php if(in_array("su_communicate_send_mass_email", $_SESSION['login_user_permissions'])) { ?>
+                            <li><a href="<?php echo SITEURL ?>message/mass_email_history"
+                                    class="navlink <?php echo $pagename=="mass_email_history"?"active":"" ?>">Mass
+                                    Emails</a></li>
+                            <?php } ?>
+
+                            <?php if(in_array("su_communicate_sent_text_create", $_SESSION['login_user_permissions'])) { ?>
+                            <li><a href="<?php echo SITEURL ?>message/mass_text_msg_history"
+                                    class="navlink <?php echo $pagename=="mass_text_msg_history"?"active":"" ?>">Text
+                                    Message Sent</a></li>
+                            <?php } ?>
+
+                            <?php if(in_array("su_communicate_list", $_SESSION['login_user_permissions'])) { ?>
+                            <li><a href="<?php echo SITEURL ?>message/mass_text_msg_reply"
+                                    class="navlink <?php echo $pagename=="mass_text_msg_reply"?"active":"" ?>">Text
+                                    Message Received
+                                    <?php echo $new_text_msg_rec > 0 ? ('<span class="label label-warning">'.$new_text_msg_rec.'</span>') : '' ?></a>
+                            </li>
+                            <?php } ?>
+
+                        </ul>
+                    </li>
+                    <?php } ?>
+
+                    <?php   if(in_array("su_homework_list", $_SESSION['login_user_permissions']) || in_array("su_homework_create", $_SESSION['login_user_permissions'])){  ?>
+                    <li
+                        class="<?php echo ($pagename=="homework_list" || $pagename=="homework_add" || $pagename=="homework_edit")?"active":"" ?>">
+                        <a href="#"><i class="icon-newspaper2"></i> <span>Homework</span></a>
+                        <ul>
+                            <li><a href="<?php echo SITEURL ?>homework/homework_list"
+                                    class="navlink <?php echo $pagename=="homework_list"?"active":"" ?>">List
+                                    Homework</a></li>
+                            <li><a href="<?php echo SITEURL ?>homework/homework_add"
+                                    class="navlink <?php echo $pagename=="homework_add"?"active":"" ?>">Add Homework</a>
+                            </li>
+
+                        </ul>
+                    </li>
+                    <?php } ?>
+                    <?php  if(in_array("su_report_list", $_SESSION['login_user_permissions'])){  ?>
+                    <li class="<?php echo ($pagename=="enroll_report")?"active":"" ?>"> <a href="#"><i
+                                class="icon-newspaper2"></i> <span>Report</span></a>
+                        <ul>
+
+                            <li><a href="<?php echo SITEURL ?>report/enroll_report"
+                                    class="navlink <?php echo $pagename=="enroll_report"?"active":"" ?>">Enrollment
+                                    Report</a></li>
+
+                        </ul>
+                    </li>
+                    <?php } ?>
+
+                    <?php   if(in_array("su_basic_fees_list", $_SESSION['login_user_permissions']) || in_array("su_discount_manage_fees_list", $_SESSION['login_user_permissions']) ){  ?>
+                    <li
+                        class="<?php echo ($pagename=="basic_fees_list" || $pagename=="discount_fees_list")?"active":"" ?>">
+                        <a href="#"><i class="icon-coins"></i> <span>Payments</span></a>
+                        <ul>
+                            <!--      <?php if(in_array("su_basic_fees_list", $_SESSION['login_user_permissions'])) { ?>
+                            <li><a href="<?php echo SITEURL ?>basicfees/basic_fees_list"
+                                    class="navlink <?php echo $pagename=="basic_fees_list"?"active":"" ?>">Basic Fees</a></li>
+                             <?php }
+
+                             if(in_array("su_discount_manage_fees_list", $_SESSION['login_user_permissions'])){ ?>
+                            <li><a href="<?php echo SITEURL ?>discountfees/discount_fees_list"
+                                    class="navlink <?php echo $pagename=="discount_fees_list"?"active":"" ?>">Fees Discounts</a></li>
+                            <?php } ?> -->
+                            <li><a href="<?php echo SITEURL ?>payment/registration_payment_history"
+                                    class="navlink <?php echo $pagename=="registration_payment_history"?"active":"" ?>">Registration
+                                    Payment History</a></li>
+
+
+                            <?php if(in_array("su_family_info", $_SESSION['login_user_permissions'])){ ?>
+                            <li><a href="<?php echo SITEURL ?>payment/family_info"
+                                    class="navlink <?php echo $pagename=="family_info"?"active":"" ?>">Family Info</a>
+                            </li>
+                            <?php } ?>
+
+
+                        </ul>
+
+
+                    </li>
+                    <?php } ?>
+
+
+                    <li
+                        class="<?php echo ($pagename=="holidays_manage" || $pagename=="announcements_manage" || $pagename=="page_list" || $pagename=="page_add" || $pagename=="page_edit")?"active":"" ?>">
+                        <a href="#"><i class="icon-make-group"></i> <span>Others</span></a>
+                        <ul>
+                            <?php  if(in_array("su_holiday_list", $_SESSION['login_user_permissions'])){  ?>
+                            <li class="<?php echo ($pagename=="holidays_manage")?"active":"" ?>"><a
+                                    href="<?php echo SITEURL ?>others/holidays_manage"
+                                    class="navlink"><span>Holidays</span></a></li>
+
+                            <li>
+                                <hr />
+                            </li>
+
+                            <li class="<?php echo ($pagename=="announcements_manage")?"active":"" ?>"><a
+                                    href="<?php echo SITEURL ?>others/announcements_manage"
+                                    class="navlink"><span>Announcements</span></a></li>
+                            <li>
+                                <hr />
+                            </li>
+                            <li><a href="<?php echo SITEURL ?>page/page_list"
+                                    class="navlink <?php echo $pagename=="page_list"?"active":"" ?>">List Pages</a></li>
+                            <li><a href="<?php echo SITEURL ?>page/page_add"
+                                    class="navlink <?php echo $pagename=="page_add"?"active":"" ?>">Add Page</a></li>
+                            <li>
+                                <hr />
+                            </li>
+
+
+                            <?php  } ?>
+
+                            <li class="<?php echo ($pagename=="login_logout")?"active":"" ?>"><a
+                                    href="<?php echo SITEURL ?>others/login_logout" class="navlink">Login History</a>
+                            </li>
+                        </ul>
+                    </li>
+
+                    <li class=""> <a href="#"><i class="icon-link"></i> <span>Usefull Links</span></a>
+                        <ul>
+
+
+                            <?php   
+                             $pages = $db->get_results("select * from ss_page where active = 1 order by page_name desc");
+
+                             if(count($pages) > 0){
+                                foreach ($pages as $page) {
+                            ?>
+                            <li class="<?php echo ($pagename == $page->slug)?"active":"" ?>"><a
+                                    href="<?php echo SITEURL ?>parents/page?slug=<?= $page->slug ?>" class="navlink"><i
+                                        class="icon-book2"></i> <span><?= $page->page_name ?></span></a></li>
+
+                            <?php } } ?>
+                        </ul>
+                    </li>
+                    <li class=""> <a href="#"><i class="fas fa-sms"></i> <span>SMS Template</span></a>
+                        <ul>
+                            <li class="<?php echo ($pagename=="list_message_template")?"active":"" ?>"><a
+                                    href="<?php echo SITEURL ?>message_template/list_message_template"
+                                    class="navlink"><i class='far fa-comment-alt'></i>
+                                    <span>Manage SMS Template</span></a></li>
+                        </ul>
+                    </li>
+                    <li class=""> <a href="#"><i class="icon-envelop2"></i> <span>Email Template</span></a>
+                        <ul>
+                            <li class="<?php echo ($pagename=="list_all_email_template")?"active":"" ?>"><a
+                                    href="<?php echo SITEURL ?>email_template/list_all_email_template"
+                                    class="navlink"><i class="icon-envelop2"></i>
+                                    <span>Manage Email Template</span></a></li>
+                        </ul>
+                    </li>
+
+                    <!-- <li class=""> <a href="#"><i class="icon-gear"></i> <span>Settings</span></a>
+                        <ul>
+                        <li class="<?php echo ($pagename=="general_settings")?"active":"" ?>"><a
+                            href="<?php echo SITEURL ?>settings/general_settings" class="navlink"><i class="icon-gear"></i>
+                            <span>General Settings</span></a></li>
+                        <li class="<?php echo ($pagename=="registration_settings")?"active":"" ?>"><a
+                            href="<?php echo SITEURL ?>settings/registration_settings" class="navlink"><i class="icon-gear"></i>
+                            <span>Registration Settings</span></a></li>
+                        </ul>
+                    </li> -->
+
+
+                    <?php if ($_SESSION['icksumm_uat_login_usertypesubgroup'] == 'admin'){ ?>
+
+                    <li class="<?php echo ($pagename=="log_view")?"active":"" ?>"><a
+                            href="<?php echo SITEURL ?>log_view" class="navlink"><i class="icon-home4"></i>
+                            <span>Log View</span></a></li>
+
+                    <?php } ?>
+
+
+
+
+
+                    <?php }else{ ?>
+
+                    <!--  ---------------------------------------------------------------- 
+        -----------------SHEIKH LINKS------------------------ -->
+
+                    <!--   ---------------------------------------------------------------- 
+       -----------------ACCOUNTANT LINKS------------------------ -->
+
+
+                    <!--  ---------------------------------------------------------------- 
+        -----------------PARENTS LINKS------------------------  -->
+
+                    <?php
+               if($_SESSION['icksumm_uat_login_usertypecode'] == 'UT05'){ ?>
+                    <li class="<?php echo ($pagename=="dashboard")?"active":"" ?>"><a
+                            href="<?php echo SITEURL ?>parents/dashboard" class="navlink"><i class="icon-home4"></i>
+                            <span>Dashboard</span></a></li>
+
+                    <?php   if(in_array("su_attendence_list", $_SESSION['login_user_permissions'])){  ?>
+                    <li class="<?php echo ($pagename=="attendance")?"active":"" ?>"><a
+                            href="<?php echo SITEURL ?>parents/attendance" class="navlink"><i
+                                class="icon-user-check"></i> <span>Attendance</span></a></li>
+                    <?php } ?>
+
+
+                    <?php   if(in_array("su_homework_list", $_SESSION['login_user_permissions'])){  ?>
+                    <li class="<?php echo ($pagename=="homework_parents")?"active":"" ?>"><a
+                            href="<?php echo SITEURL ?>homework/homework_parents" class="navlink"><i
+                                class="icon-book"></i> <span>Homework</span></a></li>
+                    <?php } ?>
+
+                    <!-- <li class="<?php echo ($pagename=="message_list" || $pagename=="message_new")?"active":"" ?>"> <a
+                            href="#"><i class="icon-envelop2"></i> <span>Message</span></a>
+                        <ul>
+
+                            <li> <a href="<?php echo SITEURL ?>message/message_list"
+                                    class="navlink <?php echo $pagename=="message_list"?"active":"" ?>">List
+                                    Messages</a></li>
+                            <li><a href="<?php echo SITEURL ?>message/message_new_parents"
+                                    class="navlink <?php echo $pagename=="message_new"?"active":"" ?>">New Message</a>
+                            </li>
+
+                        </ul>
+                    </li> -->
+
+                    <li class=""> <a href="#"><i class="icon-link"></i> <span>Usefull Links</span></a>
+                        <ul>
+
+
+                            <?php   
+                             $pages = $db->get_results("select * from ss_page where active = 1 order by page_name desc");
+
+                             if(count($pages) > 0){
+                             	foreach ($pages as $page) {
+                            ?>
+                            <li class="<?php echo ($pagename == $page->slug)?"active":"" ?>"><a
+                                    href="<?php echo SITEURL ?>parents/page?slug=<?= $page->slug ?>" class="navlink"><i
+                                        class="icon-book2"></i> <span><?= $page->page_name ?></span></a></li>
+
+                            <?php } } ?>
+                        </ul>
+                    </li>
+                    <li
+                        class="<?php echo ($pagename=="basic_fees_list" || $pagename=="discount_fees_list")?"active":"" ?>">
+                        <a href="#"><i class="icon-coins"></i> <span>Payments</span></a>
+                        <ul>
+                            <li> <a href="<?php echo SITEURL ?>parents/payment_fees_history_list"
+                                    class="navlink <?php echo $pagename=="payment_fees_history_list"?"active":"" ?>">Payment
+                                    History</a></li>
+                            <li> <a href="<?php echo SITEURL ?>parents/payment_credential_list"
+                                    class="navlink <?php echo $pagename=="payment_credential_list"?"active":"" ?>">Payment
+                                    Credential</a></li>
+
+                        </ul>
+                    </li>
+                    <!--  <li class="<?php echo ($pagename=="feedback")?"active":"" ?>"><a href="<?php echo SITEURL ?>pagesforall/feedback" class="navlink"><i class="icon-pencil"></i> <span>Feedback</span></a></li>  -->
+                    <!--  <li><a href="<?php echo SITEURL ?>help/parents_help_doc" class="navlink"><i class="icon-help"></i> <span>Help Document</span></a></li>   -->
+                    <?php }} ?>
+                </ul>
+
+                <!-- full block comment end -->
+
+
+
+            </div>
+        </div>
+        <!-- /main navigation -->
+    </div>
+</div>

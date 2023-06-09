@@ -1,0 +1,467 @@
+<?php $mob_title = "Dashboard";
+include "../header.php";
+$announcements = $db->get_results("select * from ss_announcements 
+where session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' and is_active = 1 order by display_order asc"); ?>
+<!-- Page header -->
+<!-- <script type="text/javascript" src="<?php echo SITEURL ?>assets/js/plugins/visualization/d3/d3.min.js"></script>
+<script type="text/javascript" src="<?php echo SITEURL ?>assets/js/plugins/visualization/d3/d3_tooltip.js"></script>
+<script type="text/javascript" src="<?php echo SITEURL ?>assets/js/charts/d3/bars/bars_advanced_sortable_vertical.js"></script>-->
+<!-- <style>
+#timetable.table>tbody>tr>td {
+    padding: 5px;
+    vertical-align: top;
+}
+
+#timetable .roster_hr {
+    margin: 2px 0px;
+}
+
+#timetable {
+    font-size: 13px;
+}
+
+#timetable td {
+    border: solid 1px #888;
+}
+
+#timetable th {
+    border: solid 1px #888;
+    background: #d9d9d9;
+}
+</style> -->
+<div class="page-header page-header-default">
+    <div class="page-header-content">
+        <div class="page-title">
+            <h4 class="web_item">Welcome to <?php echo CENTER_SHORTNAME.' '.SCHOOL_NAME ?></h4>
+            <!-- <a href="javascript:void(0)" class="pull-right text-danger mt-5" id="pickup_dropof_map_link"><i
+                    class="icon-bus"></i> Drop-Off / Pick-Up Map</a> -->
+        </div>
+    </div>
+    <div class="breadcrumb-line">
+        <ul class="breadcrumb">
+            <li> <a href="<?php echo SITEURL . " dashboard " ?>"> <i class="icon-home2 position-left"></i>Dashboard</a>
+            </li>
+        </ul>
+    </div>
+</div>
+<!-- /page header -->
+<!-- Content area -->
+<div class="content">
+    <?php if(count($announcements)){ ?>
+    <div class="row">
+        <div class="col-md-12">
+            <marquee class="announcement">
+                <?php foreach($announcements as $ann){ ?>
+                <span><i class="icon-bell3"></i> <?php echo $ann->message ?></span>
+                <?php } ?>
+            </marquee>
+        </div>
+    </div>
+    <?php } ?>
+    <div class="row">
+        <div class="col-md-12">
+            <div class="panel panel-flat">
+                <div class="panel-body ">
+                    <div class="row">
+                        <?php 
+            
+                                  $zoomLinkArray = array(
+                                    'level1' => 'https://zoom.us/j/5891547586',
+                                    'level2' => 'https://zoom.us/j/7091958715',
+                                    'level3' => 'https://zoom.us/j/7657397265',
+                                    'level4' => 'https://zoom.us/j/2427784656',
+
+                                  );
+
+
+	  		$students = $db->get_results("select * from ss_student s INNER JOIN ss_user u on s.user_id = u.id 
+              INNER JOIN ss_student_session_map ssm on ssm.student_user_id  = u.id where u.is_active = 1 
+              AND ssm.session_id = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' and s.family_id = '" . $_SESSION['icksumm_uat_login_familyid'] . "'");
+
+            //   echo "select * from ss_student s INNER JOIN ss_user u on s.user_id = u.id 
+            //   INNER JOIN ss_student_session_map ssm on ssm.student_user_id  = u.id where u.is_active = 1 
+            //   AND ssm.session_id = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' and s.family_id = '" . $_SESSION['icksumm_uat_login_familyid'] . "'";
+            // echo "<pre>";
+            // print_r($students);
+            // die;
+            foreach ($students as $stu) {
+
+                //$stugroupclass = $db->get_results("select g.group_name,s.class_name,ct.time_from,ct.time_to, f.first_name, f.last_name from ss_groups g inner join ss_studentgroupmap m on g.id = m.group_id inner join  ss_classes s on m.class_id = s.id inner join ss_classtime ct on ct.group_id = m.group_id inner join ss_staffclasstimemap stm on stm.classtime_id = ct.id inner join ss_staff f on f.user_id = stm.staff_user_id where m.latest = 1 and ct.is_active=1 and stm.active=1 and m.student_user_id='".$stu->user_id."' ");
+
+                // $stugroupclass = $db->get_results("SELECT DISTINCT g.group_name,s.class_name,ct.time_from,ct.time_to, f.first_name, f.last_name 
+                // FROM ss_groups g 
+                // RIGHT OUTER JOIN ss_studentgroupmap m ON g.id = m.group_id 
+                // INNER JOIN  ss_classes s ON m.class_id = s.id 
+                // INNER JOIN ss_classtime ct ON ct.group_id = m.group_id
+                // LEFT JOIN ss_staffclasstimemap stm ON stm.classtime_id = ct.id 
+                // LEFT JOIN ss_staff f ON f.user_id = stm.staff_user_id
+                // WHERE m.latest = 1 AND m.student_user_id='".$stu->user_id."' 
+                // AND ct.is_active=1 AND (stm.active = 1 OR stm.active IS NULL)");
+             
+                //COMMENTED ON 26-AUG-2021
+            	// $stugroupclass =  $db->get_results("SELECT DISTINCT g.id AS group_id, c.class_name, g.group_name, soc.meeting_url, soc.meeting_id, soc.meeting_password,
+                // (SELECT GROUP_CONCAT(CONCAT(s.first_name,' ',s.last_name)) FROM ss_staff s 
+                // INNER JOIN ss_user u ON u.id = s.user_id INNER JOIN ss_staff_session_map ssm on ssm.staff_user_id  = u.id 
+                // WHERE ssm.session_id = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' AND u.is_active = 1 AND u.is_deleted = 0 
+                // AND user_id IN ( SELECT staff_user_id FROM ss_staffclasstimemap WHERE session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' 
+                // AND ACTIVE = 1)) AS staffname FROM 
+                // ss_classes_online soc 
+                // INNER JOIN ss_groups g ON g.id = soc.group_id INNER JOIN ss_classes c ON c.id = soc.class_id 
+                // WHERE g.session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' AND c.session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' 
+                // AND g.is_active = 1 AND g.is_deleted = 0 AND c.is_active = 1 AND soc.status = 1");
+
+                //ADDED ON 26-AUG-2021
+                $stugroupclass =  $db->get_results("SELECT DISTINCT g.id AS group_id, c.class_name, g.group_name, c.id as class_id,
+                (SELECT GROUP_CONCAT(CONCAT(s.first_name,' ',s.last_name)) FROM ss_staff s 
+                INNER JOIN ss_user u ON u.id = s.user_id INNER JOIN ss_staff_session_map ssm ON ssm.staff_user_id  = u.id 
+                WHERE ssm.session_id = 3 AND u.is_active = 1 AND u.is_deleted = 0 
+                AND user_id IN ( SELECT staff_user_id FROM ss_staffclasstimemap WHERE SESSION = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' 
+                AND ACTIVE = 1)) AS staffname                
+                FROM ss_groups g INNER JOIN ss_classtime ct ON ct.group_id = g.id 
+                INNER JOIN ss_classes c ON c.id = ct.class_id 
+                INNER JOIN ss_studentgroupmap sgm ON sgm.group_id = g.id 
+                WHERE g.session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' AND c.session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' 
+                AND sgm.session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' AND sgm.latest = 1
+                AND g.is_active = 1 AND g.is_deleted = 0 AND c.is_active = 1 AND sgm.student_user_id='".$stu->user_id."'");
+
+                                
+      		?>
+                        <div class="col-lg-6">
+                            <div class="panel panel-flat" style="border:0">
+                                <div class="panel-body">
+                                    <div class="row">
+                                        <!-- <div class="col-sm-2 col-xs-3 col-md-2"> <img
+                                        src="<?php echo SITEURL ?>assets/images/dummy.jpg" alt=""
+                                        class="img-circle img-responsive" /> </div> -->
+                                        <div class="col-md-12">
+                                            <h4 style="margin-top:0; margin-bottom:0px;">
+                                                <?php echo $stu->first_name . trim(' ' . $stu->middle_name) . ' ' . $stu->last_name ?>
+                                            </h4>
+
+                                            <div class="table-responsive" style="margin-top:15px; ">
+                                                <table class="table table-bordered" id="timetable">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Class</th>
+                                                            <th>Level</th>
+                                                            <!-- <th>Teacher</th> -->
+                                                            <th>Meeting Details</th>
+                                                        </tr>
+
+                                                    </thead>
+                                                    <tbody>
+                                                        <?php  foreach ($stugroupclass as  $row) { 
+                                                            $classonline = $db->get_row("select * from ss_classes_online where status = 1 and group_id = '".$row->group_id."' 
+                                                            and class_id = '".$row->class_id."'");
+
+                                                            ?>
+                                                        <tr>
+                                                            <td>
+                                                                <?php echo  $row->class_name ?>
+                                                                <!-- <p> (<?php echo  date('h:i A',strtotime($row->time_from))  ?> - <?php echo  date('h:i A',strtotime($row->time_to)) ?>) </p> -->
+                                                            </td>
+                                                            <td><?php echo  $row->group_name ?></td>
+                                                            <!-- <td>
+                                                   <?php echo $row->staffname ?>   
+                                                   </td> -->
+
+                                                            <td>
+                                                                <?php if(trim($classonline->meeting_url) != ''){ ?>
+                                                                <table style="text-align: left; border: 0; width:100%"
+                                                                    cellspacing="0" cellpadding="2">
+                                                                    <tr>
+                                                                        <td>Meeting Url:</td>
+                                                                        <td><a href="<?php echo  $classonline->meeting_url ?>"
+                                                                                target="_blank"><?php echo  $classonline->meeting_url ?></a>
+                                                                        </td>
+                                                                    </tr>
+                                                                    <tr>
+                                                                        <td>Meeting ID:</td>
+                                                                        <td><?php echo $classonline->meeting_id ?></td>
+                                                                    </tr>
+                                                                    <tr>
+                                                                        <td>Meeting Password:</td>
+                                                                        <td><?php echo $classonline->meeting_password ?></td>
+                                                                    </tr>
+                                                                </table>
+                                                                <?php }else{ ?>
+                                                                    Not available
+                                                                <?php } ?>
+                                                            </td>
+                                                        </tr>
+                                                        <?php } ?>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <?php
+            }
+            ?>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- EVENT CALENDAR -->
+    <?php
+    $event_calendar =$db->get_results("SELECT * FROM ss_school_calendar  where session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' 
+    and status = 1 ORDER BY program_date asc, program_name DESC");
+
+    if(count($event_calendar)){
+    ?>
+    <div class="row">
+        <div class="col-md-12">
+            <div class="panel panel-flat">
+                <div class="panel-heading">
+                    <h6 class="panel-title">Calendar (<?php echo $_SESSION['icksumm_uat_CURRENT_SESSION_TEXT']; ?>)
+                    </h6>
+                </div>
+                <div class="panel-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered">
+                            <tbody>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Program / Event</th>
+                                </tr>
+                                <?php foreach($event_calendar as $event){ ?>
+                                <tr>
+                                    <td><?php echo date('F d, Y', strtotime($event->program_date)) ?></td>
+                                    <td><?php echo $event->program_name ?></td>
+                                </tr>
+                                <?php } ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php } ?>
+</div>
+
+<!-- Add Modal - Assign Teacher-->
+<div id="modal_assign_teacher" class="modal fade">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form name="frmAssignTeacher" id="frmAssignTeacher" class="form-validate-jquery" method="post">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
+                    <h5 class="modal-title">Assign Teacher / Helper / Substitute - <span
+                            id="modal_title_classtime"></span> </h5>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-12">
+                            <strong>Teacher: </strong>
+                        </div>
+                        <div class="col-md-12">
+                            <div class="form-group multi-select-full">
+                                <?php 
+//                                     $teacher = $db->get_results("SELECT s.user_id, s.first_name,s.last_name FROM ss_staff s 
+//                                     INNER JOIN ss_user u ON s.user_id = u.id WHERE u.is_active = 1 AND u.is_deleted = 0 AND u.user_type_id in  
+// (SELECT id FROM ss_usertype WHERE user_type_code = 'UT02' and user_type_subgroup = 'teacher') order by s.first_name asc,s.last_name asc"); 
+
+                                        $teacher = $db->get_results("SELECT s.user_id, s.first_name,s.last_name FROM ss_staff s 
+                                        INNER JOIN ss_user u ON s.user_id = u.id INNER JOIN ss_staff_session_map ssm1 ON s.user_id = ssm1.staff_user_id
+                                        INNER JOIN ss_usertypeusermap utum ON u.id = utum.user_id 
+                                        WHERE u.is_active = 1 AND u.is_deleted = 0  AND ssm1.session_id = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."'
+                                        AND utum.user_type_id in (SELECT id FROM ss_usertype 
+                                        WHERE user_type_code = 'UT02' and user_type_subgroup = 'teacher') order by s.first_name asc,s.last_name asc");
+?>
+                                <select id="teacher_id" name="teacher_id" class="select form-control" required
+                                    style="width:100%">
+                                    <option value="">Select</option>
+                                    <?php foreach($teacher as $tea){ ?>
+                                    <option value="<?php echo $tea->user_id ?>">
+                                        <?php echo $tea->first_name." ".$tea->last_name ?> </option>
+                                    <?php } ?>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <strong>Helper: </strong>
+                        </div>
+                        <div class="col-md-12">
+                            <div class="form-group multi-select-full">
+                                <?php 
+                                    // $helper = $db->get_results("SELECT s.user_id, s.first_name,s.last_name FROM ss_staff s INNER JOIN ss_user u ON s.user_id = u.id 
+                                    // WHERE u.is_active = 1 AND u.is_deleted = 0 AND u.user_type_id in  
+                                    // (SELECT id FROM ss_usertype WHERE user_type_code = 'UT02' and user_type_subgroup = 'teacher_helper') 
+                                    // order by s.first_name asc,s.last_name asc"); 
+                                    
+                                    $helper = $db->get_results("SELECT s.user_id, s.first_name,s.last_name FROM ss_staff s INNER JOIN ss_user u 
+                                    ON s.user_id = u.id INNER JOIN ss_staff_session_map ssm1 ON s.user_id = ssm1.staff_user_id INNER JOIN ss_usertypeusermap utum ON u.id = utum.user_id 
+                                    WHERE u.is_active = 1 AND u.is_deleted = 0  AND ssm1.session_id = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."'
+                                    AND utum.user_type_id in (SELECT id FROM ss_usertype WHERE user_type_code = 'UT02' and user_type_subgroup = 'teacher_helper') 
+                                    order by s.first_name asc,s.last_name asc");
+                                    ?>
+                                <select id="helper_id" name="helper_id" class="select form-control" style="width:100%">
+                                    <option value="">Select</option>
+                                    <?php foreach($helper as $hea){ ?>
+                                    <option value="<?php echo $hea->user_id ?>">
+                                        <?php echo $hea->first_name." ".$hea->last_name ?> </option>
+                                    <?php } ?>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <strong>Substitute: </strong>
+                        </div>
+                        <div class="col-md-12">
+                            <div class="form-group multi-select-full">
+                                <?php                                     
+                                    // $substitute = $db->get_results("SELECT s.user_id, s.first_name,s.last_name FROM ss_staff s 
+                                    // INNER JOIN ss_user u ON s.user_id = u.id WHERE u.is_active = 1 AND u.is_deleted = 0 AND u.user_type_id in  
+                                    // (SELECT id FROM ss_usertype WHERE user_type_code = 'UT02' and user_type_subgroup = 'teacher_substitute') 
+                                    // order by s.first_name asc,s.last_name asc"); 
+
+                                    $substitute = $db->get_results("SELECT s.user_id, s.first_name,s.last_name FROM ss_staff s INNER JOIN ss_user u 
+                                    ON s.user_id = u.id INNER JOIN ss_staff_session_map ssm1 ON s.user_id = ssm1.staff_user_id 
+                                    INNER JOIN ss_usertypeusermap utum ON u.id = utum.user_id 
+                                    WHERE u.is_active = 1 AND u.is_deleted = 0 AND ssm1.session_id = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."'
+                                    AND utum.user_type_id in (SELECT id FROM ss_usertype WHERE user_type_code = 'UT02' and user_type_subgroup = 'teacher_substitute') 
+                                    order by s.first_name asc,s.last_name asc");
+                                    ?>
+                                <select id="substitute_id" name="substitute_id" class="select form-control"
+                                    style="width:100%">
+                                    <option value="">Select</option>
+                                    <?php foreach($substitute as $sub){ ?>
+                                    <option value="<?php echo $sub->user_id ?>">
+                                        <?php echo $sub->first_name." ".$sub->last_name ?> </option>
+                                    <?php } ?>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <div class="ajaxMsgBot"></div>
+                    <button type="submit" class="btn btn-success"> <i
+                            class="icon-spinner2 spinner hide marR10 insidebtn"></i> Assign</button>
+                    <button type="button" class="btn btn-link" data-dismiss="modal">Close</button>
+                    <input type="hidden" name="classtimeid" id="assign_tr_classtimeid">
+                    <input type="hidden" name="action" value="assign_teacher_to_classtime">
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<!-- /Add modal -->
+<!-- Modal - Map-->
+<div id="modal_mail_detail" class="modal fade">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                <h5 class="modal-title">Drop-Off / Pick-Up Map</h5>
+            </div>
+            <div class="modal-body viewonly">
+                <img src="<?php echo SITEURL."assets/images/pickup_dropoff_map.jpg" ?>" style="max-width:100%" />
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-link" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- /Modal -->
+<script>
+$(document).ready(function(e) {
+    //SHOW PICKUP-DROPOFF MAP
+    $(document).on('click', '#pickup_dropof_map_link', function() {
+        $('#modal_mail_detail').modal('show');
+    });
+
+    <?php
+        if (check_userrole_by_code('UT01')) { ?>
+    //OPEN MODAL WINDOW TO SEND EMAIL
+    $(document).on('click', '.send_email', function() {
+        var groupid = $(this).data('groupid');
+        $('#groupid').val(groupid);
+
+        var groupname = $(this).data('groupname');
+        $('.modal_groupname').html(groupname);
+
+        $('#modal_email').modal('show');
+    });
+
+    //ASSIGN TEACHER TO CLASS TIME - OPEN POPUIP
+    $(document).on('click', '.assign_teacher', function() {
+        $('#assign_tr_classtimeid').val($(this).data('classtimeid'));
+
+        $('#modal_title_classtime').html($(this).data('groupname') + ' (' + $(this).data(
+            'classname') + ')');
+        $('#teacher_id').val($(this).attr('data-teacheruserid'));
+        $('#helper_id').val($(this).attr('data-helperuserid'));
+        $('#substitute_id').val($(this).attr('data-substituteuserid'));
+        $('.select').change();
+
+        $('#modal_assign_teacher').modal('show');
+    });
+
+    //ASSIGN TEACHER TO CLASS TIME - SAVE DATA
+    $('#frmAssignTeacher').submit(function(e) {
+        e.preventDefault();
+
+        if ($('#frmAssignTeacher').valid()) {
+            var targetUrl = '<?php echo SITEURL ?>ajax/ajss-classes';
+            $('.spinner').removeClass('hide');
+
+            var formDate = $(this).serialize();
+            $.post(targetUrl, formDate, function(data, status) {
+                if (status == 'success') {
+                    if (data.code == 1) {
+                        $('#teacher_' + data.classtimeid).html(data.teacher_name);
+                        $('#teachername_' + data.classtimeid).removeClass('hide');
+
+                        $('#helper_' + data.classtimeid).html(data.helper_name);
+                        if ($.trim(data.helper_name) != '') {
+                            $('#helpername_' + data.classtimeid).removeClass('hide');
+                            $('#assign_classtime_' + data.classtimeid).attr(
+                                'data-helperuserid', data.helper_id);
+                        } else {
+                            $('#helpername_' + data.classtimeid).addClass('hide');
+                            $('#assign_classtime_' + data.classtimeid).attr(
+                                'data-helperuserid', '');
+                        }
+
+                        $('#substitute_' + data.classtimeid).html(data.substitute_name);
+                        if ($.trim(data.substitute_name) != '') {
+                            $('#substitutename_' + data.classtimeid).removeClass(
+                                'hide');
+                            $('#assign_classtime_' + data.classtimeid).attr(
+                                'data-substituteuserid', data.substitute_id);
+                        } else {
+                            $('#substitutename_' + data.classtimeid).addClass('hide');
+                            $('#assign_classtime_' + data.classtimeid).attr(
+                                'data-substituteuserid', '');
+                        }
+
+                        displayAjaxMsg(data.msg, data.code);
+                        $("#frmAssignTeacher")[0].reset();
+                        $(".select").change();
+                    } else {
+                        displayAjaxMsg(data.msg, data.code);
+                    }
+                } else {
+                    displayAjaxMsg(data.msg);
+                }
+            }, 'json');
+        }
+    });
+    <?php } ?>
+});
+</script>
+<!-- /Content area -->
+<?php include "../footer.php" ?>

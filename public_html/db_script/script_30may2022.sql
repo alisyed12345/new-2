@@ -1,0 +1,5 @@
+INSERT INTO `ss_usertype` (`id`, `user_type`, `user_type_code`, `user_type_group`, `user_type_subgroup`, `preference`, `is_active`, `created_on`, `updated_on`) VALUES (NULL, 'SystemUser', 'UT00', 'systemuser', 'system_user', '9', '1', '2022-05-30 14:27:02.000000', '2022-05-30 14:27:02.000000');
+
+INSERT INTO `ss_user` (`id`, `username`, `password`, `email`, `my_comments`, `user_type_id`, `session`, `is_email_verified`, `password_expired`, `is_locked`, `is_active`, `is_deleted`, `created_on`, `updated_on`) VALUES (NULL, 'systemuser', '123455', 'system.user@demo.com', NULL, '9', '6', '1', '0', '0', '1', '0', '2022-05-30 14:29:03.000000', '2022-05-30 14:29:03.000000');
+
+INSERT INTO `ss_usertypeusermap` (`id`, `user_id`, `user_type_id`, `session`, `created_by_user_id`, `created_on`) VALUES (NULL, '2197', '9', '6', '1', '2022-05-30 14:33:09.000000');

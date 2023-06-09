@@ -1,0 +1,1 @@
+ALTER TABLE `ss_payment_sch_item_cron_backup` ADD `is_cancel` BOOLEAN NOT NULL DEFAULT FALSE AFTER `retry_count`;

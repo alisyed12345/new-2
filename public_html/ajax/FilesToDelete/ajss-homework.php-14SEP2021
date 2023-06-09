@@ -1,0 +1,440 @@
+<?php 
+include_once "../includes/config.php";
+
+//AUTHARISATION CHECK
+if(!isset($_SESSION['icksumm_uat_login_userid'])){
+	return;
+}
+
+
+//==========================LIST HOMEWORK=====================
+if($_GET['action'] == 'list_homework') { 
+	if(check_userrole_by_code('UT05') || check_userrole_by_code('UT01') || in_array("su_homework_list", $_SESSION['login_user_permissions'])){   
+		$finalAry = array();
+		
+		//if($_SESSION['icksumm_uat_login_usertypecode'] == 'UT01'){
+		if(check_userrole_by_code('UT01')){	
+			//SUPER ADMIN  
+			$homeworks = $db->get_results("SELECT h.id, h.homework_text,  h.homework_attechment, 
+			(select class_name from ss_classes where session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' and 
+			id = h.class_id) as class_name, g.group_name, h.group_id, DATE_FORMAT(h.created_on,'%m/%d/%Y') AS created_on 
+			FROM ss_homework h left outer join ss_groups g on h.group_id = g.id where h.group_id is not null and h.student_user_id is  null 
+			and h.session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."'
+			UNION
+			SELECT h.id, h.homework_text,  h.homework_attechment, (select class_name from ss_classes 
+			where session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' 
+			and id = h.class_id) as class_name, 
+			concat(s.first_name,' ',s.last_name) as group_name, h.group_id, DATE_FORMAT(h.created_on,'%m/%d/%Y') AS created_on 
+			FROM ss_homework h left outer join ss_student s on h.student_user_id = s.user_id where h.student_user_id is not null 
+			and h.session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."'  ORDER BY id DESC",ARRAY_A);
+			   
+		   for($i=0; $i<count($homeworks); $i++){
+	
+			  if(!empty($homeworks[$i]['homework_attechment'])){
+				 $homeworks[$i]['homework_attechment'] = "<a href='".SITEURL."homework/attachments/".$homeworks[$i]['homework_attechment']."' title='Attachment' class='text-success' target='_blank'>Attachment</a>";
+				}else{
+				 $homeworks[$i]['homework_attechment'] = "";
+				}
+		  }
+	
+	
+		}elseif(check_userrole_by_code('UT02')){
+			//SHEIKH  
+			$homeworks = $db->get_results("SELECT h.id, h.homework_text,  h.homework_attechment, (select class_name from ss_classes 
+			where id = h.class_id) as class_name, g.group_name, h.group_id, DATE_FORMAT(h.created_on,'%m/%d/%Y') AS created_on
+			FROM ss_homework h left outer join ss_groups g on h.group_id = g.id where h.session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' 
+			and h.group_id in (SELECT group_id FROM ss_classtime WHERE id IN (SELECT classtime_id FROM ss_staffclasstimemap 
+			WHERE h.student_user_id IS NULL and staff_user_id = '".$_SESSION['icksumm_uat_login_userid']."'))
+			UNION
+			SELECT h.id, h.homework_text,  h.homework_attechment, (select class_name from ss_classes where id = h.class_id) as class_name, 
+			CONCAT(s.first_name,' ',s.last_name) AS group_name, '' AS group_id, DATE_FORMAT(h.created_on,'%m/%d/%Y') AS created_on 
+			FROM ss_homework h INNER JOIN ss_student s ON h.student_user_id = s.user_id INNER JOIN ss_studentgroupmap gm ON gm.student_user_id = s.user_id 
+			WHERE h.session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' 
+			AND h.`class_id` IN (SELECT class_id FROM ss_classtime
+			WHERE is_active = 1 AND id IN (SELECT classtime_id FROM ss_staffclasstimemap WHERE ACTIVE=1
+			AND staff_user_id = '".$_SESSION['icksumm_uat_login_userid']."')) ORDER BY id DESC",ARRAY_A);
+	
+		  for($i=0; $i<count($homeworks); $i++){
+	
+			  if(!empty($homeworks[$i]['homework_attechment'])){
+				 $homeworks[$i]['homework_attechment'] = "<a href='".SITEURL."homework/attachments/".$homeworks[$i]['homework_attechment']."' title='Attachment' class='text-success action_link overlay_link' target='_blank'>Attachment</a>";
+				}else{
+				 $homeworks[$i]['homework_attechment'] = "";
+				}
+		  }
+		}elseif(check_userrole_by_code('UT05')){
+			//PARENTS
+			$homeworks = $db->get_results("SELECT h.id, h.homework_text,  h.homework_attechment, (select class_name from ss_classes where id = h.class_id) as class_name,  
+			g.group_name, h.group_id, DATE_FORMAT(h.created_on,'%m/%d/%Y') AS created_on FROM ss_homework h LEFT OUTER JOIN ss_groups g ON h.group_id = g.id 
+			WHERE h.session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' and h.student_user_id IS NULL and h.group_id IN (SELECT DISTINCT group_id 
+			FROM ss_studentgroupmap WHERE student_user_id IN (SELECT user_id FROM ss_student s1 inner join ss_user u1 on s1.user_id = u1.id 
+			INNER JOIN ss_student_session_map ssm ON ssm.student_user_id = u1.id  WHERE ssm.session_id = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' 
+			and family_id = '".$_SESSION['icksumm_uat_login_familyid']."'))
+			UNION
+			SELECT h.id, h.homework_text,  h.homework_attechment, (select class_name from ss_classes where id = h.class_id) as class_name, 
+			CONCAT(s.first_name,' ',s.last_name) AS group_name, '' AS group_id, DATE_FORMAT(h.created_on,'%m/%d/%Y') AS created_on FROM ss_homework h 
+			INNER JOIN ss_student s ON h.student_user_id = s.user_id inner join ss_user u1 on s.user_id = u1.id 
+			INNER JOIN ss_student_session_map ssm ON ssm.student_user_id = u1.id WHERE ssm.session_id = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' 
+			and u1.session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' and h.student_user_id IS NOT NULL 
+			AND s.family_id = '".$_SESSION['icksumm_uat_login_familyid']."' ORDER BY id DESC",ARRAY_A);
+
+			for($i=0; $i<count($homeworks); $i++){
+
+				if(!empty($homeworks[$i]['homework_attechment'])){
+					$homeworks[$i]['homework_attechment'] = "<a href='".SITEURL."homework/attachments/".$homeworks[$i]['homework_attechment']."' title='Attachment' class='text-success action_link' target='_blank'>Attachment</a>";
+				}else{
+					$homeworks[$i]['homework_attechment'] = ""; 
+				}
+			}
+		
+		}
+		
+		$finalAry['data'] = $homeworks;
+		echo json_encode($finalAry);
+		exit;
+	}
+}
+
+//==========================ADD STAFF=====================
+elseif($_POST['action'] == 'homework_add'){
+
+
+	if(in_array("su_homework_create", $_SESSION['login_user_permissions'])){
+	
+		try{
+	
+		  $db->query('BEGIN');	
+		  $group_id = $_POST['group_id'];
+		  $class_id = $_POST['subject'];
+		  $homework_target = $_POST['homework_target'];  
+		  $name = str_replace(' ','-',$_FILES['homework_attechment']['name']);
+		 
+		  $target_dir = "homework/attachments/";
+	
+		  $target_file = ROOTPATH.$target_dir.basename($name);
+			// echo $target_file;
+			// die;
+		  // Select file type
+		  $imageFileType = strtolower(pathinfo($target_file,PATHINFO_EXTENSION));
+	
+		  //move_uploaded_file($tmp_name, SITE_ROOT."/FOLDERTOUPLOADTO/$name");
+		 
+		  // Valid file extensions
+		  $extensions_arr = array("jpg","jpeg","png","gif","pdf","xls","xlsx","odt","ppt","pptx","txt","doc","docx","rtf");
+	
+	
+	
+		  // Check extension
+		$subject = CENTER_SHORTNAME.' '.SCHOOL_NAME." Homework";
+		if($homework_target == 'whole_group'){
+			$homework = $db->query("insert into ss_homework set session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."', homework_attechment='".$name."', homework_text='".trim($db->escape($_POST['homework_text']))."', 
+			group_id='".$group_id."', class_id='".$class_id."', created_by_user_id='".$_SESSION['icksumm_uat_login_userid']."', created_on='".date('Y-m-d H:i:s')."', 
+			updated_by_user_id='".$_SESSION['icksumm_uat_login_userid']."', updated_on='".date('Y-m-d H:i:s')."'");
+	
+			$homework_id = $db->insert_id;
+			if($homework_id > 0){
+	
+				$studentInfo = $db->get_results("SELECT DISTINCT sgm.student_user_id, f.primary_email, f.secondary_email, 
+				CONCAT(s.first_name,' ',s.last_name) AS student_name, g.group_name, c.class_name
+				FROM ss_student s 
+				INNER JOIN ss_studentgroupmap sgm ON s.`user_id` = sgm.student_user_id
+				INNER JOIN ss_user u ON u.id = sgm.student_user_id
+				INNER JOIN ss_student_session_map ssm ON ssm.student_user_id = u.id
+				INNER JOIN ss_family f ON s.family_id = f.id
+				INNER JOIN ss_groups g ON g.id = sgm.group_id
+				INNER JOIN ss_classes c ON c.`id` = sgm.class_id 
+				WHERE sgm.latest = 1
+				AND sgm.group_id = '".$group_id."' 
+				AND sgm.class_id = '".$class_id."'
+				AND u.is_active = 1 
+				AND u.is_deleted = 0
+				AND g.is_active = 1 
+				AND g.is_deleted = 0
+				AND c.is_active = 1
+				ORDER BY s.`user_id` DESC
+				");
+	
+	
+	
+				if(count($studentInfo) > 0){
+	 
+				foreach($studentInfo as $info){
+	
+					$message = "Assalamo alaikum,<br><br>".CENTER_SHORTNAME.' '.SCHOOL_NAME." homework for your kid <strong>".$info->student_name."</strong> is given below:<br><br><br> <strong style='text-transform:uppercase'><u>".$info->class_name."</u></strong><br><br>".trim($db->escape($_POST['homework_text']))." ";
+					$sql_bulk_msg = $db->query("insert into ss_bulk_message set subject = '".$subject."', session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."',
+					message = '".$db->escape($message)."', is_report_gen = 0, request_from = 'homework_module', created_on = '".date('Y-m-d H:i:s')."'");
+					$message_id = $db->insert_id;
+					 
+					if($message_id > 0){
+	
+						$fullpath_file = $target_file;	//'/'.$target_dir.$name;
+						$db->query("insert into ss_bulk_message_attachment set bulk_message_id = '".$message_id."', attachment_file = '".$fullpath_file."' ");
+	
+						if(!empty($info->primary_email)){
+							$results = $db->query("insert into ss_bulk_message_emails set bulk_message_id = '".$message_id."', receiver_email = '".$info->primary_email."', 
+							is_cc = 0, is_bcc = 0, delivery_status = 2, attempt_counter = 0");
+						}
+	
+						if(!empty($info->secondary_email)){
+							$results = $db->query("insert into ss_bulk_message_emails set bulk_message_id = '".$message_id."', receiver_email = '".$info->secondary_email."', 
+							is_cc = 0, is_bcc = 0, delivery_status = 2, attempt_counter = 0");
+						}
+	
+						
+					}else{
+						$db->query('ROLLBACK');
+						   if(isset($_POST['submit_form']) && !empty($_POST['submit_form'])){
+							  $_SESSION['error']="Homework processed failed.";
+							  header("location:".SITEURL."homework/homework_add");
+							}else{
+							  echo json_encode(array('code' => "0",'msg' => 'Homework processed failed.'));
+							  exit;
+							}
+					}
+	
+	
+				}
+	
+			}
+	
+			}else{
+	
+				$db->query('ROLLBACK');
+	
+				if(isset($_POST['submit_form']) && !empty($_POST['submit_form'])){
+				  $_SESSION['error']="Homework processed failed.";
+				  header("location:".SITEURL."homework/homework_add");
+				}else{
+				  echo json_encode(array('code' => "0",'msg' => 'Homework processed failed.'));
+				  exit;
+				}
+	
+			}
+			
+					
+		}else{
+			$test = '-1-';
+			$homework = $db->query("insert into ss_homework set session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."', homework_attechment='".$name."', homework_text='".trim($db->escape($_POST['homework_text']))."', 
+			group_id='".$group_id."', class_id='".$class_id."',
+			student_user_id='".$homework_target."', created_by_user_id='".$_SESSION['icksumm_uat_login_userid']."', created_on='".date('Y-m-d H:i:s')."', 
+			updated_by_user_id='".$_SESSION['icksumm_uat_login_userid']."', updated_on='".date('Y-m-d H:i:s')."'");	
+			$homework_id = $db->insert_id;
+			$test .= '-2-homework_id='.$homework_id;
+			if($homework_id > 0){
+	
+				// $info = $db->get_row("SELECT DISTINCT sgm.student_user_id, f.primary_email, f.secondary_email, 
+				// CONCAT(s.first_name,' ',s.last_name) AS student_name, g.group_name, c.class_name
+				// FROM ss_student s 
+				// INNER JOIN ss_studentgroupmap sgm ON s.`user_id` = sgm.student_user_id
+				// INNER JOIN ss_user u ON u.id = sgm.student_user_id
+				// INNER JOIN ss_student_session_map ssm ON ssm.student_user_id = u.id
+				// INNER JOIN ss_family f ON s.family_id = f.id
+				// INNER JOIN ss_groups g ON g.id = sgm.group_id
+				// INNER JOIN ss_classes c ON c.`id` = sgm.class_id 
+				// WHERE sgm.latest = 1
+				// AND sgm.group_id = '".$group_id."' 
+				// AND sgm.class_id = '".$class_id."'
+				// AND sgm.student_user_id = '".$homework_target."'
+				// AND u.is_active = 1 
+				// AND u.is_deleted = 0
+				// AND g.is_active = 1 
+				// AND g.is_deleted = 0
+				// AND c.is_active = 1
+				// ORDER BY s.`user_id` DESC
+				// ");
+	
+				$info = $db->get_row("SELECT DISTINCT sgm.student_user_id, f.primary_email, f.secondary_email, 
+				CONCAT(s.first_name,' ',s.last_name) AS student_name, s.family_id,
+				g.group_name, c.class_name FROM ss_student s 
+				INNER JOIN ss_studentgroupmap sgm ON s.`user_id` = sgm.student_user_id 
+				INNER JOIN ss_user u ON u.id = sgm.student_user_id 
+				INNER JOIN ss_student_session_map ssm ON ssm.student_user_id = u.id 
+				INNER JOIN ss_family f ON s.family_id = f.id 
+				INNER JOIN ss_groups g ON g.id = sgm.group_id 
+				INNER JOIN `ss_classtime` ct ON ct.`group_id` = g.`id`
+				INNER JOIN ss_classes c ON c.`id` = ct.class_id 
+				WHERE sgm.latest = 1 
+				AND sgm.group_id = '".$group_id."' AND ct.class_id = '".$class_id."' AND sgm.student_user_id = '".$homework_target."' AND u.is_active = 1 AND u.is_deleted = 0 
+				AND g.is_active = 1 
+				AND g.is_deleted = 0 AND c.is_active = 1 ORDER BY s.`user_id` DESC ");
+
+	
+				if(!empty($info) > 0){
+	
+					$test .= '-3-';
+
+					$message = "Assalamo alaikum,<br><br>".CENTER_SHORTNAME.' '.SCHOOL_NAME." homework for your kid <strong>".$info->student_name."</strong> is given below:<br><br><br> <strong style='text-transform:uppercase'><u>".$info->class_name."</u></strong><br><br>".trim($db->escape($_POST['homework_text']))." ";
+					$sql_bulk_msg = $db->query("insert into ss_bulk_message set subject = '".$subject."', message = '".$db->escape($message)."', is_report_gen = 0, 
+					session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."', request_from = 'homework_module', created_on = '".date('Y-m-d H:i:s')."'");
+					$message_id = $db->insert_id;
+					 
+					if($message_id > 0){ 
+						
+							if(!empty($name)){
+								//$fullpath_file = '/'.$target_dir.$name;
+								$fullpath_file = $target_file;	//'/'.$target_dir.$name;
+								$db->query("insert into ss_bulk_message_attachment set bulk_message_id = '".$message_id."', attachment_file = '".$fullpath_file."' ");
+							}
+	
+						if(!empty($info->primary_email)){ $test .= '-4-'."insert into ss_bulk_message_emails set bulk_message_id = '".$message_id."', receiver_email = '".$info->primary_email."', 
+							is_cc = 0, is_bcc = 0, delivery_status = 2, attempt_counter = 0";
+							$results = $db->query("insert into ss_bulk_message_emails set bulk_message_id = '".$message_id."', receiver_email = '".$info->primary_email."', 
+							is_cc = 0, is_bcc = 0, delivery_status = 2, attempt_counter = 0");
+						}
+	
+						if(!empty($info->secondary_email)){
+							$results = $db->query("insert into ss_bulk_message_emails set bulk_message_id = '".$message_id."', receiver_email = '".$info->secondary_email."', 
+							is_cc = 0, is_bcc = 0, delivery_status = 2, attempt_counter = 0");
+						}
+	
+						
+					}else{
+						$db->query('ROLLBACK');
+						if(isset($_POST['submit_form']) && !empty($_POST['submit_form'])){
+							 $_SESSION['error']="Homework processed failed..";
+							  header("location:".SITEURL."homework/homework_add");
+						}else{
+							echo json_encode(array('code' => "0",'msg' => 'Homework processed failed.'));
+							 exit;
+						}
+						
+					}
+	
+				}
+	
+			}else{
+	
+				$db->query('ROLLBACK');
+				if(isset($_POST['submit_form']) && !empty($_POST['submit_form'])){
+					$_SESSION['error']="Homework processed failed.";
+					header("location:".SITEURL."homework/homework_add");
+				}else{
+				  echo json_encode(array('code' => "0",'msg' => 'Homework processed failed.'));
+				  exit;
+				}
+	
+			}
+	
+		}
+		if(in_array($imageFileType,$extensions_arr) ){
+		move_uploaded_file($_FILES['homework_attechment']['tmp_name'], $target_file);
+		}
+	
+	
+		if($homework_id > 0 && $db->query('COMMIT') !== false){
+	
+			if(isset($_POST['submit_form']) && !empty($_POST['submit_form'])){
+			 $_SESSION['success']="Homework added successfully";
+			 header("location:".SITEURL."homework/homework_add");
+			}else{
+			 echo json_encode(array('code' => "1",'msg' => 'Homework save sucessfully..'));	
+			 exit;
+			}
+			
+			
+	
+		}else{
+			$db->query('ROLLBACK');
+			if(isset($_POST['submit_form']) && !empty($_POST['submit_form'])){
+			  $_SESSION['error']="Homework not added successfully";
+			  header("location:".SITEURL."homework/homework_add");
+			}else{
+			 echo json_encode(array('code' => "0",'msg' => 'Homework processed failed.'));
+			  exit;
+			}
+			
+			
+		}
+	
+		}catch(Exception $e) {
+			$db->query('ROLLBACK');
+			$return_resp = $e->getMessage();
+			CreateLog($_REQUEST, json_encode($return_resp));
+			echo json_encode($return_resp);
+			exit;
+	
+		}
+	}
+	}
+	
+	
+	//==========================EDIT HOMEWORK=====================
+	elseif($_POST['action'] == 'homework_edit'){
+		if(in_array("su_homework_edit", $_SESSION['login_user_permissions'])){
+		
+			$id = $_POST['homework_id'];
+			$homework_target = $_POST['homework_target'];
+		
+			if(!empty($_FILES['homework_attechment']['name'] )){
+		
+			$name = str_replace(' ','-',$_FILES['homework_attechment']['name']);
+		
+			$target_dir = "homework/attachments/";
+			$target_file = ROOTPATH.$target_dir.basename($name);
+		
+			// Select file type
+			$imageFileType = strtolower(pathinfo($target_file,PATHINFO_EXTENSION));
+			// Valid file extensions
+			$extensions_arr = array("jpg","jpeg","png","gif","pdf","xls","xlsx","odt","ppt","pptx","txt","doc","docx","rtf");
+		
+			if(in_array($imageFileType,$extensions_arr) ){
+				if(!empty($_POST['old_attachment'])){
+				unlink(ROOTPATH.$target_dir.$_POST['old_attachment']);
+				}
+				move_uploaded_file($_FILES['homework_attechment']['tmp_name'], $target_file);
+			}else{
+				$_SESSION['error']="Homework attachment file type not correct";
+				header("location:".SITEURL."homework/homework_edit?id=$id");
+				exit;
+			}
+		
+			}elseif(empty($name)  &&  !empty($_POST['old_attachment'])){
+				$name = $_POST['old_attachment'];
+			}else{
+				$name = "";
+			}
+		
+			
+			if($homework_target == 'whole_group'){
+				$homework = $db->query("update ss_homework set homework_text='".trim($db->escape($_POST['homework_text']))."', homework_attechment='".$name."', group_id='".$_POST['group']."', class_id='".$_POST['subject']."', updated_by_user_id='".$_SESSION['icksumm_uat_login_userid']."', updated_on='".date('Y-m-d H:i:s')."' where id = '".$id."'");		
+			}else{
+				$homework = $db->query("update ss_homework set homework_text='".trim($db->escape($_POST['homework_text']))."', homework_attechment='".$name."', group_id='".$_POST['group']."', class_id='".$_POST['subject']."', student_user_id='".$homework_target."', updated_by_user_id='".$_SESSION['icksumm_uat_login_userid']."', updated_on='".date('Y-m-d H:i:s')."' where id = '".$id."'");	
+			}
+		
+			if($homework){
+				$_SESSION['success']="Homework updated successfully";
+				header("location:".SITEURL."homework/homework_edit?id=$id");
+				exit;
+			}else{
+				$_SESSION['error']="Homework not updated";
+				header("location:".SITEURL."homework/homework_edit?id=$id");
+				exit;
+			}
+		}
+	}
+	
+	//=====================DELETE HOMEWORK==================
+	elseif($_POST['action'] == 'delete_homework'){	
+		if(in_array("su_homework_delete", $_SESSION['login_user_permissions'])){
+			if(isset($_POST['id'])){
+				$rec = $db->query("delete from ss_homework where id='".$_POST['id']."'");
+				
+				if($rec > 0){
+					echo json_encode(array('code' => "1",'msg' => 'Homework deleted successfully'));
+					exit;
+				}else{
+					$return_resp = array('code' => "0",'msg' => 'Homework not deletion');
+					CreateLog($_REQUEST, json_encode($return_resp));
+					echo json_encode($return_resp);
+					exit;
+				}
+			}else{
+				$return_resp = array('code' => "0",'msg' => 'Error: Process failed');
+				CreateLog($_REQUEST, json_encode($return_resp));
+				echo json_encode($return_resp);
+				exit;
+			}
+		}
+	}
+	
+	?>

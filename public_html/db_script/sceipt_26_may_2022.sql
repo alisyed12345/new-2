@@ -1,0 +1,1 @@
+ALTER TABLE `ss_sunday_sch_req_child` ADD `is_delete` BOOLEAN NULL DEFAULT FALSE AFTER `user_id`; 

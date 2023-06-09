@@ -1,0 +1,1 @@
+ALTER TABLE `ss_staff` ADD `is_deleted` TINYINT(4) NOT NULL DEFAULT '0' AFTER `photo`; 

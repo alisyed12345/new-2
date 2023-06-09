@@ -1,0 +1,2 @@
+ALTER TABLE `ick_saturday_academy`.`ss_invoice`   
+  ADD COLUMN `is_type` TINYINT(6) DEFAULT 0 NULL COMMENT 'reg_internal=1, reg_external=2, schedule_pay=3, manual_pay=4, wallet_transaction=5, refund=6' AFTER `reason`;

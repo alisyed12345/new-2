@@ -1,0 +1,1 @@
+UPDATE ss_config SET `value` ='stripe' WHERE `key`='PAYMENT_GATEWAYE_MODE_KEYWORD'

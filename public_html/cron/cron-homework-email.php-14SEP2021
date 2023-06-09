@@ -1,0 +1,138 @@
+<?php 
+//LIVE - PROD SITE
+// set_include_path('/home3/bayyanor/public_html/ick/summercamp/includes/');
+//set_include_path('/webroot/b/a/bayyan005/icksaturdaydv.click2clock.com/www/includes/');
+
+//LIVE - QA SITE
+set_include_path('/home3/bayyanor/public_html/ick/academy_new/includes/');
+
+require "config.php";
+
+//CURRENT SESSION
+$current_session_row = $db->get_row("select * from ss_school_sessions where current = 1 ");
+$current_session = $current_session_row->id;
+
+$classAry = array();
+$classes = $db->get_results("SELECT * FROM ss_classes WHERE is_active = 1");
+foreach($classes as $cl){
+	$classAry[$cl->id] = "";
+}
+
+$studentInfo = $db->get_results("SELECT s.user_id, f.primary_email, f.secondary_email, CONCAT(s.first_name,' ',s.last_name) AS student_name FROM ss_user u 
+INNER JOIN ss_student_session_map ssm ON ssm.student_user_id = u.id
+INNER JOIN ss_student s ON u.id = s.user_id INNER JOIN ss_family f ON s.family_id = f.id INNER JOIN ss_usertypeusermap utg ON u.id = utg.user_id 
+INNER JOIN ss_usertype ut ON ut.id = utg.user_type_id WHERE u.is_active = 1 and u.is_deleted != 1 
+and ssm.session_id = '".$current_session."' AND ut.user_type_code = 'UT03'");
+
+foreach($studentInfo as $stu){
+	$classAryTemp = $classAry;
+	$classAryTemp['email'] = $stu->primary_email.(trim($stu->secondary_email) != ""?("|".trim($stu->secondary_email)):"");
+	$classAryTemp['student_name'] = ucwords($stu->student_name);
+	$rawData[$stu->user_id] = $classAryTemp;
+}
+ 
+$studentHWInfo = $db->get_results("SELECT * FROM ss_homework WHERE session = '".$current_session."' AND student_user_id IS NOT NULL 
+AND DATE(created_on) = '".date('Y-m-d')."'");
+
+foreach($studentHWInfo as $hw){
+	if($rawData[$hw->student_user_id][$hw->class_id] == ""){
+		$rawData[$hw->student_user_id][$hw->class_id] = $hw->homework_text;
+	}
+	else{
+		$rawData[$hw->student_user_id][$hw->class_id] = $rawData[$hw->student_user_id][$hw->class_id] ."<br><br>". $hw->homework_text;
+	} 
+} 
+
+$studentGroupHWInfo = $db->get_results("SELECT sgm.student_user_id, h.class_id, h.homework_text FROM ss_homework h 
+INNER JOIN ss_studentgroupmap sgm ON h.`group_id` = sgm.group_id 
+WHERE h.session = '".$current_session."' AND sgm.latest = 1 AND h.student_user_id IS NULL AND DATE(h.created_on) = '".date('Y-m-d')."'");
+
+foreach($studentGroupHWInfo as $hw){
+	if($rawData[$hw->student_user_id][$hw->class_id] == ""){
+		$rawData[$hw->student_user_id][$hw->class_id] = $hw->homework_text;
+	}
+	else{
+		$rawData[$hw->student_user_id][$hw->class_id] = $rawData[$hw->student_user_id][$hw->class_id] ."<br><br>". $hw->homework_text;
+	}
+}
+
+foreach($rawData as $key => $val){
+	$message = "";
+
+	$db->query('BEGIN');	
+
+	try{
+		$hasHomeWork = false;
+
+		foreach($classes as $cl){
+			if(trim($val[$cl->id]) != ""){ 
+				$hasHomeWork = true;
+
+				if($message == ""){
+					$message = "<strong style='text-transform:uppercase'><u>".$cl->class_name."</u></strong><br><br>".$val[$cl->id];
+				}else{
+					$message .= "<br><br><br><strong style='text-transform:uppercase'><u>".$cl->class_name."</u></strong><br><br>".$val[$cl->id];
+				}				
+			}
+			else{
+				if($message == ""){
+					$message = "<strong style='text-transform:uppercase'><u>".$cl->class_name."</u></strong><br><br>No homework for this subject";
+				}else{
+					$message .= "<br><br><br><strong style='text-transform:uppercase'><u>".$cl->class_name."</u></strong><br><br>No homework for this subject";
+				}
+			}
+		} 
+
+		if($message != "" && $hasHomeWork){			
+			$subject = SCHOOL_NAME." Homework";
+
+			$message = "Assalamo alaikum,<br><br>".SCHOOL_NAME." homework for your kid <strong>".$val['student_name']."</strong> is given below:<br><br><br>".$message;
+
+			$sql_bulk_msg = "insert into ss_bulk_message set subject = '".$subject."', message = '".addslashes($message)."', is_report_gen = 0, 
+			request_from = 'homework_module', created_on = '".date('Y-m-d H:i:s')."'";
+		
+			if($db->query($sql_bulk_msg )){ 
+				$emailStatus = false; 
+				$message_id = $db->insert_id;
+			
+				$emails = explode('|',$val['email']);
+
+				foreach($emails as $em){ 
+					if(trim($em) != ''){ 
+						//CHECK IF HOMEWORK HAS ALREADY BEEN ADDED FOR STUDENT
+						$hwCheck = $db->get_var("select count(1) from ss_bulk_message m inner join ss_bulk_message_emails e on m.id = e.bulk_message_id 
+						where m.session = '".$current_session."' and e.receiver_email = '".$em."' and m.request_from = 'homework_module' 
+						and date(m.created_on) = '".date('Y-m-d')."'");
+
+						if($hwCheck == 0){
+							if($db->query("insert into ss_bulk_message_emails set bulk_message_id = '".$message_id."', receiver_email = '".$em."', 
+							is_cc = 0, is_bcc = 0, delivery_status = 2, attempt_counter = 0")){
+								$emailStatus = true;
+							}
+						}
+					}
+				} 
+				
+				if($emailStatus && $db->query('COMMIT') !== false){
+					//SUCCESS
+					//echo "SUCCESS - ".$val['email']."<br>";
+				}else{
+					//echo "FAIL Email could not be saved - ".$val['student_name']."<br>";
+					$db->query('ROLLBACK');
+				}
+			}else{ 
+				//echo "FAIL Message could not be saved<br>"; 
+				$db->query('ROLLBACK');
+			}
+		}else{
+			//echo "FAIL Blank message<br>";
+			$db->query('ROLLBACK');
+		}
+	}
+	catch(Exception $ex){
+		//echo "FAIL Exception<br>";
+		$db->query('ROLLBACK');
+	}
+}
+
+?>

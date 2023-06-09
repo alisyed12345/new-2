@@ -1,0 +1,849 @@
+<?php 
+include_once "../includes/config.php";
+
+$attendance_day_number = date('w');
+
+//AUTHARISATION CHECK
+if(!isset($_SESSION['icksumm_uat_login_userid'])){
+	return;
+}
+
+//==========================DISPLAY ATTENDANCE HISTORY=====================
+if($_POST['action'] == 'get_attendance_of_groupoo'){
+ 
+	$retAry = array();
+	$group_id = $_POST['group'];
+	$class_id = $_POST['group_class'];
+	
+	 $period = explode('-',$_POST['period']);
+	 $get_month =  $period[0];
+	 $get_year =  $period[1];
+	
+     $begin = date("$get_year-$get_month-01");
+	 $monthcount   = date('t', strtotime($get_month, $get_year));
+	 $end = date("$get_year-$get_month-$monthcount");    
+	
+	 $school_days = $db->get_row("select school_opening_days from ss_client_settings where status = 1 order by id desc limit 1");
+	 $serdays = unserialize($school_days->school_opening_days);
+	//  echo"<pre>";
+	//  print_r($serdays);
+	// die;
+
+	 $days_array = [];
+	 foreach($serdays as $row){
+
+		$startDate = new DateTime($begin);
+		$endDate = new DateTime($end);
+
+		while ($startDate <= $endDate) {
+			if ($startDate->format('w') == $row) {
+				 $days_array[] = $startDate->format('d');
+				//array_push($days_array,$day);
+			}
+		 $startDate->modify('+1 day');
+		}
+    }
+
+	 $table_header = '<th>Student</th>';
+
+	 for($i = 0; $i < $monthcount; $i++){
+		$ddadd = $i+1;
+		$dd = str_pad($ddadd, 2, '0', STR_PAD_LEFT);
+		$time = mktime(12, 0, 0, $get_month, $dd, $get_year);            
+		if (date('m', $time) == $get_month){
+			$table_header .= '<th>'.date ("M d D", strtotime("+$i day", strtotime($begin))).'</th>';
+		}
+	}
+	
+	$group_stu = $db->get_results("select user_id, CONCAT(first_name,' ',COALESCE(middle_name,''),' ',COALESCE(last_name,'')) AS student_name 
+	from ss_student s INNER JOIN ss_user u ON s.user_id = u.id INNER JOIN ss_student_session_map ssm ON ssm.student_user_id = u.id 
+	WHERE ssm.session_id = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' and u.is_deleted = 0 AND s.user_id 
+	in (select student_user_id from ss_studentgroupmap where session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' 
+	and latest = 1 and class_id='".$class_id."' and group_id='".$group_id."')");
+
+	if(count($group_stu)){
+
+		$retAry['data_found'] = 1;
+			
+		foreach($group_stu as $stu){
+			$table_row .= '<tr><td>';
+			
+			if(check_userrole_by_code('UT01')){	
+				$table_row .= '<a href="'.SITEURL.'student/student_edit.php?id='.$stu->user_id.'" target="_blank">'.$stu->student_name.'</a>';
+			}else{
+				$table_row .= '<a href="javascript:void(0)" class="viewdetail" data-studentname="'.$stu->student_name.'" data-userid="'.$stu->user_id.'">'.$stu->student_name.'</a>';
+			}
+			
+			$table_row .= '</td>';
+			
+			for($i = 0; $i < $monthcount; $i++){
+				$ddadd = $i+1;
+				$dd = str_pad($ddadd, 2, '0', STR_PAD_LEFT);
+
+				str_pad($value, 8, '0', STR_PAD_LEFT);
+				$time = mktime(12, 0, 0, $get_month, $dd, $get_year);  
+
+				if (date('m', $time) == $get_month){
+					if(in_array($dd, $days_array)){				
+						
+						$table_row .= '<td>';
+
+						$holidayAllGrpCheck = $db->get_results("SELECT * FROM ss_holidays WHERE is_for_all_groups = 1 
+						AND date_start <= '".date('Y-m-d',$time)."' AND date_end >= '".date('Y-m-d',$time)."'");
+
+						$holidaySpecGrpCheck = $db->get_results("SELECT * FROM ss_holidays h INNER JOIN ss_holiday_groups hg 
+						ON h.id = hg.holiday_id WHERE is_for_all_groups = 0 AND date_start <= '".date('Y-m-d',$time)."' 
+						AND date_end >= '".date('Y-m-d',$time)."' AND hg.group_id = '".$group_id."'");
+
+						if(!count($holidayAllGrpCheck) && !count($holidaySpecGrpCheck)){
+							//if(date('Y-m-d') != date('Y-m-d',$time)){							
+								$student_group_map_id = $db->get_var("select id from ss_studentgroupmap where
+								session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' and latest = 1 and 
+								group_id='".$group_id."' and class_id='".$class_id."' and student_user_id = '".$stu->user_id."' ");
+								
+								//REPLACE date('w') WITH 0 FOR TESTING
+								// $classtime_id = $db->get_var("select id from ss_classtime where class_id = '".$class_id."' and group_id = '".$group_id."' and day_number='".date('w')."'");
+
+								$classtime_id = $db->get_var("select id from ss_classtime where session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' 
+								and class_id = '".$class_id."' and group_id = '".$group_id."'");
+
+								//COMMENTED ON 26AUG2021
+								// $atten_info = $db->get_row("select * from ss_attendance where session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' 
+								// AND student_user_id='".$stu->user_id."' 
+								// and attendance_date='".date('Y-m-d',$time)."' and student_group_map_id='".$student_group_map_id."' 
+								// and classtime_id='".$classtime_id."'"); 
+
+								//ADDEDON 26AUG2021
+								$atten_info = $db->get_row("select * from ss_attendance where session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' 
+								AND student_user_id='".$stu->user_id."' 
+								and attendance_date='".date('Y-m-d',$time)."'  
+								and classtime_id='".$classtime_id."'");
+
+
+								// echo "select * from ss_attendance where session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' 
+								// AND student_user_id='".$stu->user_id."' 
+								// and attendance_date='".date('Y-m-d',$time)."' and student_group_map_id='".$student_group_map_id."' 
+								// and classtime_id='".$classtime_id."'"; exit;
+
+								if(count($atten_info)){
+									//if($_SESSION['icksumm_uat_login_usertypecode'] == 'UT01'){
+									if(check_userrole_by_code('UT01')){	
+										//INSIDE - SUPER ADMIN
+										/*$table_row .= '<input type="checkbox" '.($atten_info->is_present?'checked="checked"':'').' class="atten_check"><input type="hidden" name="attendance['.$stu->user_id.']['.date('Y-m-d',$time).']" class="atten_hid" value="'.$atten_info->is_present.'" />';*/
+										
+										//COMMENTED ON 01-JUN-2021
+										//$table_row .= '<input type="radio" '.($atten_info->is_present==1?'checked="checked"':'').' name="att_'.$time.'_'.$stu->user_id.'" value="1" class="atten_check"> P <input type="radio" '.($atten_info->is_present==2?'checked="checked"':'').' name="att_'.$time.'_'.$stu->user_id.'" value="2" class="atten_check"> L <input type="radio" '.($atten_info->is_present==0?'checked="checked"':'').' name="att_'.$time.'_'.$stu->user_id.'" class="atten_check" value="0"> A <input type="hidden" name="attendance['.$stu->user_id.']['.date('Y-m-d',$time).']" class="atten_hid" value="'.$atten_info->is_present.'" />';
+
+										//ADDED ON 01-JUN-2021
+										$table_row .= '
+										<div class="radio">
+										<label>
+										<input type="radio" '.($atten_info->is_present==1?'checked="checked"':'').' name="att_'.$time.'_'.$stu->user_id.'" value="1" class="atten_check"> P 
+										</label>
+										</div>
+										<div class="radio">
+										<label>
+										<input type="radio" '.($atten_info->is_present==2?'checked="checked"':'').' name="att_'.$time.'_'.$stu->user_id.'" value="2" class="atten_check"> L 
+										</label>
+										</div>
+										<div class="radio">
+										<label>
+										<input type="radio" '.($atten_info->is_present==0?'checked="checked"':'').' name="att_'.$time.'_'.$stu->user_id.'" class="atten_check" value="0"> A 
+										</label>
+										</div>	
+										<input type="hidden" name="attendance['.$stu->user_id.']['.date('Y-m-d',$time).']" class="atten_hid" value="'.$atten_info->is_present.'" />';
+									}elseif(check_userrole_by_code('UT02') || check_userrole_by_code('UT04')){
+										//INSIDE - STAFF (SHEIKH/ACCOUNTANT)
+										if($atten_info->is_present == 1){
+											$table_row .= '<span class="label att_pres">Present</span>';
+										}elseif($atten_info->is_present == 2){
+											$table_row .= '<span class="label att_late">Late</span>';
+										}elseif($atten_info->is_present == 0){
+											$table_row .= '<span class="label att_abse">Absent</span>';
+										}elseif($atten_info->is_present == '-1'){
+                                            $table_row .= '<span class="label "></span>';
+										}
+									}
+								}else{
+									//if($_SESSION['icksumm_uat_login_usertypecode'] == 'UT01'){
+									if(check_userrole_by_code('UT01')){	
+										//INSIDE - SUPER ADMIN
+										//COMMENTED ON 01-JUN-2021
+										//$table_row .= '<input type="radio" name="att_'.$time.'_'.$stu->user_id.'" value="1" class="atten_check"> P <input type="radio" name="att_'.$time.'_'.$stu->user_id.'" value="2" class="atten_check"> L <input type="radio" name="att_'.$time.'_'.$stu->user_id.'" class="atten_check" value="0"> A
+										//<input type="hidden" name="attendance['.$stu->user_id.']['.date('Y-m-d',$time).']" class="atten_hid" value="-1" />';
+
+										//ADDED ON 01-JUN-2021
+										$table_row .= '
+										<div class="radio">
+										<label>
+										<input type="radio" name="att_'.$time.'_'.$stu->user_id.'" value="1" class="atten_check"> P 
+										</label>
+										</div>
+										<div class="radio">
+										<label>
+										<input type="radio" name="att_'.$time.'_'.$stu->user_id.'" value="2" class="atten_check"> L 
+										</label>
+										</div>
+										<div class="radio">
+										<label>
+										<input type="radio" name="att_'.$time.'_'.$stu->user_id.'" class="atten_check" value="0"> A
+										</label>
+										</div>
+										<input type="hidden" name="attendance['.$stu->user_id.']['.date('Y-m-d',$time).']" class="atten_hid" value="-1" />';
+									}elseif(check_userrole_by_code('UT02') || check_userrole_by_code('UT04')){
+										//INSIDE - STAFF (SHEIKH/ACCOUNTANT)
+										//$table_row .= '<input type="checkbox" disabled="disabled">';
+										$table_row .= '';
+									}
+								}
+							//}
+						}else{ 
+							$holiday_reason = '';
+							if(count($holidayAllGrpCheck)){
+								foreach($holidayAllGrpCheck as $holi){
+									if($holiday_reason == ''){
+										$holiday_reason = '<span class="label label-danger">'.$holi->reason.'</span>';
+									}else{
+										$holiday_reason = $holiday_reason.', <span class="label label-danger">'.$holi->reason.'</span>';
+									}
+								}
+							}elseif(count($holidaySpecGrpCheck)){ 
+								foreach($holidaySpecGrpCheck as $holi){
+									if($holiday_reason == ''){
+										$holiday_reason = '<span class="label label-danger">'.$holi->reason.'</span>';
+									}else{
+										$holiday_reason = $holiday_reason.', <span class="label label-danger">'.$holi->reason.'</span>';
+									}
+								}
+							}
+
+							$table_row .=  $holiday_reason;
+						}
+						$table_row .= '</td>';
+					}else{
+						$table_row .= '<td> </td>';
+					}
+					
+					
+				}
+			}
+			
+			$table_row .= '</tr>';
+		}
+	}else{
+		$retAry['data_found'] = 0;
+	}
+	
+	$sheet = '<table class="table table-bordered" id="attendance_sheet"><thead><tr>'.$table_header.'</tr></thead>';
+	$sheet .= '<tbody>'.$table_row.'</tbody>';
+	$sheet .= '</table>';
+	
+	if($retAry['data_found'] == 0){
+		$sheet .= '<div>No record found</div>';
+	}
+	
+	$retAry['sheet'] = $sheet;
+	
+	echo json_encode($retAry);
+	exit;
+}
+if($_POST['action'] == 'get_attendance_of_group'){
+ 
+	$retAry = array();
+	$group_id = $_POST['group'];
+	$class_id = $_POST['group_class'];
+	
+	 $period = explode('-',$_POST['period']);
+	 $get_month =  $period[0];
+	 $get_year =  $period[1];
+	
+     $begin = date("$get_year-$get_month-01");
+	 $monthcount   = date('t', strtotime($get_month, $get_year));
+	 $end = date("$get_year-$get_month-$monthcount");    
+	
+	 $school_days = $db->get_row("select school_opening_days from ss_client_settings where status = 1 order by id desc limit 1");
+	 $serdays = unserialize($school_days->school_opening_days);
+	//  echo"<pre>";
+	//  print_r($serdays);
+	// die;
+
+	 $days_array = [];
+	 foreach($serdays as $row){
+
+		$startDate = new DateTime($begin);
+		$endDate = new DateTime($end);
+
+		while ($startDate <= $endDate) {
+			if ($startDate->format('w') == $row) {
+				 $days_array[] = $startDate->format('d');
+				//array_push($days_array,$day);
+			}
+		 $startDate->modify('+1 day');
+		}
+    }
+
+	 $table_header = '<th>Student</th>';
+
+	 for($i = 0; $i < $monthcount; $i++){
+		$ddadd = $i+1;
+		$dd = str_pad($ddadd, 2, '0', STR_PAD_LEFT);
+		$time = mktime(12, 0, 0, $get_month, $dd, $get_year);            
+		if (date('m', $time) == $get_month){
+			$table_header .= '<th>'.date ("M d D", strtotime("+$i day", strtotime($begin))).'</th>';
+		}
+	}
+	
+	if(ONE_STUDENT_ONE_LEVEL == 1){
+		$group_stu = $db->get_results("select user_id, CONCAT(first_name,' ',COALESCE(middle_name,''),' ',COALESCE(last_name,'')) AS student_name 
+		from ss_student s INNER JOIN ss_user u ON s.user_id = u.id INNER JOIN ss_student_session_map ssm ON ssm.student_user_id = u.id 
+		WHERE ssm.session_id = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' and u.is_deleted = 0 AND s.user_id 
+		in (select student_user_id from ss_studentgroupmap where session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' 
+		and latest = 1 and group_id='".$group_id."')");
+	}else{
+		$group_stu = $db->get_results("select user_id, CONCAT(first_name,' ',COALESCE(middle_name,''),' ',COALESCE(last_name,'')) AS student_name 
+		from ss_student s INNER JOIN ss_user u ON s.user_id = u.id INNER JOIN ss_student_session_map ssm ON ssm.student_user_id = u.id 
+		WHERE ssm.session_id = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' and u.is_deleted = 0 AND s.user_id 
+		in (select student_user_id from ss_studentgroupmap where session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' 
+		and latest = 1 and class_id='".$class_id."' and group_id='".$group_id."')");
+	}
+
+	if(count($group_stu)){
+
+		$retAry['data_found'] = 1;
+			
+		foreach($group_stu as $stu){
+			$table_row .= '<tr><td>';
+			
+			if(check_userrole_by_code('UT01')){	
+				$table_row .= '<a href="'.SITEURL.'student/student_edit.php?id='.$stu->user_id.'" target="_blank">'.$stu->student_name.'</a>';
+			}else{
+				$table_row .= '<a href="javascript:void(0)" class="viewdetail" data-studentname="'.$stu->student_name.'" data-userid="'.$stu->user_id.'">'.$stu->student_name.'</a>';
+			}
+			
+			$table_row .= '</td>';
+			
+			for($i = 0; $i < $monthcount; $i++){
+				$ddadd = $i+1;
+				$dd = str_pad($ddadd, 2, '0', STR_PAD_LEFT);
+
+				str_pad($value, 8, '0', STR_PAD_LEFT);
+				$time = mktime(12, 0, 0, $get_month, $dd, $get_year);  
+
+				if (date('m', $time) == $get_month){
+					if(in_array($dd, $days_array)){				
+						
+						$table_row .= '<td>';
+
+						$holidayAllGrpCheck = $db->get_results("SELECT * FROM ss_holidays WHERE is_for_all_groups = 1 
+						AND date_start <= '".date('Y-m-d',$time)."' AND date_end >= '".date('Y-m-d',$time)."'");
+
+						$holidaySpecGrpCheck = $db->get_results("SELECT * FROM ss_holidays h INNER JOIN ss_holiday_groups hg 
+						ON h.id = hg.holiday_id WHERE is_for_all_groups = 0 AND date_start <= '".date('Y-m-d',$time)."' 
+						AND date_end >= '".date('Y-m-d',$time)."' AND hg.group_id = '".$group_id."'");
+
+						if(!count($holidayAllGrpCheck) && !count($holidaySpecGrpCheck)){
+							//if(date('Y-m-d') != date('Y-m-d',$time)){		
+								if(ONE_STUDENT_ONE_LEVEL == 1){
+									$student_group_map_id = $db->get_var("select id from ss_studentgroupmap where
+									session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' and latest = 1 and 
+									group_id='".$group_id."' and student_user_id = '".$stu->user_id."' ");
+								}else{					
+									$student_group_map_id = $db->get_var("select id from ss_studentgroupmap where
+									session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' and latest = 1 and 
+									group_id='".$group_id."' and class_id='".$class_id."' and student_user_id = '".$stu->user_id."' ");
+								}
+								
+								//REPLACE date('w') WITH 0 FOR TESTING
+								// $classtime_id = $db->get_var("select id from ss_classtime where class_id = '".$class_id."' and group_id = '".$group_id."' and day_number='".date('w')."'");
+
+								$classtime_id = $db->get_var("select id from ss_classtime where session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' 
+								and class_id = '".$class_id."' and group_id = '".$group_id."'");
+
+								//COMMENTED ON 26AUG2021
+								// $atten_info = $db->get_row("select * from ss_attendance where session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' 
+								// AND student_user_id='".$stu->user_id."' 
+								// and attendance_date='".date('Y-m-d',$time)."' and student_group_map_id='".$student_group_map_id."' 
+								// and classtime_id='".$classtime_id."'"); 
+
+								//ADDEDON 26AUG2021
+							
+								$atten_info = $db->get_row("select * from ss_attendance where session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' 
+								AND student_user_id='".$stu->user_id."' 
+								and attendance_date='".date('Y-m-d',$time)."'  
+								and classtime_id='".$classtime_id."'");
+
+								// echo "select * from ss_attendance where session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' 
+								// AND student_user_id='".$stu->user_id."' 
+								// and attendance_date='".date('Y-m-d',$time)."' and student_group_map_id='".$student_group_map_id."' 
+								// and classtime_id='".$classtime_id."'"; exit;
+
+								if(count($atten_info)){ 
+									//if($_SESSION['icksumm_uat_login_usertypecode'] == 'UT01'){
+									if(check_userrole_by_code('UT01')){	
+										//INSIDE - SUPER ADMIN
+										/*$table_row .= '<input type="checkbox" '.($atten_info->is_present?'checked="checked"':'').' class="atten_check"><input type="hidden" name="attendance['.$stu->user_id.']['.date('Y-m-d',$time).']" class="atten_hid" value="'.$atten_info->is_present.'" />';*/
+										
+										//COMMENTED ON 01-JUN-2021
+										//$table_row .= '<input type="radio" '.($atten_info->is_present==1?'checked="checked"':'').' name="att_'.$time.'_'.$stu->user_id.'" value="1" class="atten_check"> P <input type="radio" '.($atten_info->is_present==2?'checked="checked"':'').' name="att_'.$time.'_'.$stu->user_id.'" value="2" class="atten_check"> L <input type="radio" '.($atten_info->is_present==0?'checked="checked"':'').' name="att_'.$time.'_'.$stu->user_id.'" class="atten_check" value="0"> A <input type="hidden" name="attendance['.$stu->user_id.']['.date('Y-m-d',$time).']" class="atten_hid" value="'.$atten_info->is_present.'" />';
+
+										//ADDED ON 01-JUN-2021
+										$table_row .= '
+										<div class="radio">
+										<label>
+										<input type="radio" '.($atten_info->is_present==1?'checked="checked"':'').' name="att_'.$time.'_'.$stu->user_id.'" value="1" class="atten_check"> P 
+										</label>
+										</div>
+										<div class="radio">
+										<label>
+										<input type="radio" '.($atten_info->is_present==2?'checked="checked"':'').' name="att_'.$time.'_'.$stu->user_id.'" value="2" class="atten_check"> L 
+										</label>
+										</div>
+										<div class="radio">
+										<label>
+										<input type="radio" '.($atten_info->is_present==0?'checked="checked"':'').' name="att_'.$time.'_'.$stu->user_id.'" class="atten_check" value="0"> A 
+										</label>
+										</div>	
+										<input type="hidden" name="attendance['.$stu->user_id.']['.date('Y-m-d',$time).']" class="atten_hid" value="'.$atten_info->is_present.'" />';
+									}elseif(check_userrole_by_code('UT02') || check_userrole_by_code('UT04')){
+										//INSIDE - STAFF (SHEIKH/ACCOUNTANT)
+										if($atten_info->is_present == 1){
+											$table_row .= '<span class="label att_pres">Present</span>';
+										}elseif($atten_info->is_present == 2){
+											$table_row .= '<span class="label att_late">Late</span>';
+										}elseif($atten_info->is_present == 0){
+											$table_row .= '<span class="label att_abse">Absent</span>';
+										}elseif($atten_info->is_present == '-1'){
+                                            $table_row .= '<span class="label "></span>';
+										}
+									}
+								}else{ 
+									//if($_SESSION['icksumm_uat_login_usertypecode'] == 'UT01'){
+									if(check_userrole_by_code('UT01')){	
+										//INSIDE - SUPER ADMIN
+										//COMMENTED ON 01-JUN-2021
+										//$table_row .= '<input type="radio" name="att_'.$time.'_'.$stu->user_id.'" value="1" class="atten_check"> P <input type="radio" name="att_'.$time.'_'.$stu->user_id.'" value="2" class="atten_check"> L <input type="radio" name="att_'.$time.'_'.$stu->user_id.'" class="atten_check" value="0"> A
+										//<input type="hidden" name="attendance['.$stu->user_id.']['.date('Y-m-d',$time).']" class="atten_hid" value="-1" />';
+
+										//ADDED ON 01-JUN-2021
+										$table_row .= '
+										<div class="radio">
+										<label>
+										<input type="radio" name="att_'.$time.'_'.$stu->user_id.'" value="1" class="atten_check"> P 
+										</label>
+										</div>
+										<div class="radio">
+										<label>
+										<input type="radio" name="att_'.$time.'_'.$stu->user_id.'" value="2" class="atten_check"> L 
+										</label>
+										</div>
+										<div class="radio">
+										<label>
+										<input type="radio" name="att_'.$time.'_'.$stu->user_id.'" class="atten_check" value="0"> A
+										</label>
+										</div>
+										<input type="hidden" name="attendance['.$stu->user_id.']['.date('Y-m-d',$time).']" class="atten_hid" value="-1" />';
+									}elseif(check_userrole_by_code('UT02') || check_userrole_by_code('UT04')){
+										//INSIDE - STAFF (SHEIKH/ACCOUNTANT)
+										//$table_row .= '<input type="checkbox" disabled="disabled">';
+										$table_row .= '';
+									}
+								}
+							//}
+						}else{
+							$holiday_reason = '';
+							if(count($holidayAllGrpCheck)){
+								foreach($holidayAllGrpCheck as $holi){
+									if($holiday_reason == ''){
+										$holiday_reason = '<span class="label label-danger">'.$holi->reason.'</span>';
+									}else{
+										$holiday_reason = $holiday_reason.', <span class="label label-danger">'.$holi->reason.'</span>';
+									}
+								}
+							}elseif(count($holidaySpecGrpCheck)){ 
+								foreach($holidaySpecGrpCheck as $holi){
+									if($holiday_reason == ''){
+										$holiday_reason = '<span class="label label-danger">'.$holi->reason.'</span>';
+									}else{
+										$holiday_reason = $holiday_reason.', <span class="label label-danger">'.$holi->reason.'</span>';
+									}
+								}
+							}
+
+							$table_row .=  $holiday_reason;
+						}
+						$table_row .= '</td>';
+					}else{
+						$table_row .= '<td> </td>';
+					}
+					
+					
+				}
+			}
+			
+			$table_row .= '</tr>';
+		}
+	}else{
+		$retAry['data_found'] = 0;
+	}
+	
+	$sheet = '<table class="table table-bordered" id="attendance_sheet"><thead><tr>'.$table_header.'</tr></thead>';
+	$sheet .= '<tbody>'.$table_row.'</tbody>';
+	$sheet .= '</table>';
+	
+	if($retAry['data_found'] == 0){
+		$sheet .= '<div>No record found</div>';
+	}
+	
+	$retAry['sheet'] = $sheet;
+	
+	echo json_encode($retAry);
+	exit;
+}
+
+//==========================DISPLAY TODAY'S ATTENDANCE=====================
+elseif($_POST['action'] == 'get_group_todays_attendance'){
+	$retAry = array();
+	$group_id = $_POST['group'];
+	$class_id = $_POST['group_class'];
+	
+	$d =  date('d');
+	$month =  date('m');
+	$year =  date('Y');
+	
+	$holidayAllGrpCheck = $db->get_results("SELECT * FROM ss_holidays WHERE is_for_all_groups = 1 AND date_start <= '".($year."-".$month."-".$d)."' AND date_end >= '".($year."-".$month."-".$d)."'");
+
+	$holidaySpecGrpCheck = $db->get_results("SELECT * FROM ss_holidays h INNER JOIN ss_holiday_groups hg ON h.id = hg.holiday_id WHERE is_for_all_groups = 0 AND date_start <= '".($year."-".$month."-".$d)."' AND date_end >= '".($year."-".$month."-".$d)."' AND hg.group_id = '".$group_id."'");
+
+	if(!count($holidayAllGrpCheck) && !count($holidaySpecGrpCheck)){
+		$group_stu = $db->get_results("select user_id, family_id, CONCAT(first_name,' ',COALESCE(middle_name,''),' ',COALESCE(last_name,'')) AS student_name from ss_student s INNER JOIN ss_user u ON s.user_id = u.id INNER JOIN ss_student_session_map ssm ON ssm.student_user_id = u.id WHERE ssm.session_id = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' and u.is_deleted = 0 AND s.user_id in (select student_user_id from ss_studentgroupmap where latest = 1 and  class_id='".$class_id."' and group_id='".$group_id."')");
+		
+		if(count($group_stu)){
+			$retAry['data_found'] = 1;
+				
+			foreach($group_stu as $stu){
+				$family_info = $db->get_row("select * from ss_family where id = '".$stu->family_id."'");
+				
+				$phones = (trim($family_info->father_area_code)!=''?($family_info->father_area_code.'-'):'').$family_info->father_phone;
+				if($phones != ''){
+					$phones = $phones.', '.(trim($family_info->mother_area_code)!=''?($family_info->mother_area_code.'-'):'').$family_info->mother_phone;
+				}else{
+					$phones = $family_info->mother_area_code.'-'.$family_info->mother_phone;
+				}
+				
+				$time = mktime(12, 0, 0, $month, $d, $year);          
+				if(date('Y-m-d') == date('Y-m-d',$time)){
+					
+					$student_group_map_id = $db->get_var("select id from ss_studentgroupmap where latest = 1 and 
+					group_id='".$group_id."' and class_id = '".$class_id."' and student_user_id = '".$stu->user_id."' order by id desc");
+
+					
+					//REPLACE date('w') WITH 0 FOR TESTING
+					$classtime_id = $db->get_var("select id from ss_classtime where class_id = '".$class_id."' and group_id = '".$group_id."' and day_number = '".$attendance_day_number."'");
+
+					$atten_info = $db->get_row("select * from ss_attendance where student_user_id='".$stu->user_id."' 
+					and session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' and
+					attendance_date='".date('Y-m-d',$time)."' and student_group_map_id='".$student_group_map_id."' and classtime_id='".$classtime_id."'"); 
+				
+					if(count($atten_info)){
+						//if($_SESSION['icksumm_uat_login_usertypecode'] == 'UT01'){
+						if(check_userrole_by_code('UT01')){	
+							$retAry['show_submit_btn'] = 1;
+							$retAry['show_homework_box'] = 1;
+						}else{
+							$retAry['show_submit_btn'] = 0;
+							$retAry['show_homework_box'] = 1;
+						}
+						
+						$att_val = $atten_info->is_present;
+						
+						if($atten_info->is_present == 0){
+							$att_class = 'att_abse';
+						}elseif($atten_info->is_present == 1){							
+							$att_class = 'att_pres';
+						}elseif($atten_info->is_present == 2){							
+							$att_class = 'att_late';
+						}
+					}else{
+						$retAry['show_homework_box'] = 0;
+						$retAry['show_submit_btn'] = 1;
+						$att_val = '0'; 
+						$att_class = 'att_abse';
+					}
+					
+					$table_row .= '<div class="col-md-4 col-sm-6">';
+					$table_row .= '<div class="att_day '.$att_class.' atten_check" data-userid="'.$stu->user_id.'">'.$stu->student_name.'<br><small>'.$phones.'</small></div>';
+					$table_row .= '<input type="hidden" name="attendance['.$stu->user_id.']['.date('Y-m-d').']" class="atten_hid" value="'.$att_val.'" />';
+					$table_row .= '</div>';
+				}
+			}
+		}else{
+			$retAry['data_found'] = 0;
+		}
+		
+		$sheet .= $table_row;	
+		
+		if($retAry['data_found'] == 0){
+			$sheet = '<div class="col-lg-12">Oops! No student found in selected group</div>';
+		}else{
+			$group_stu = $db->get_results("SELECT s.* FROM ss_student s INNER JOIN ss_studentgroupmap m ON s.user_id = m.student_user_id WHERE m.group_id = '".$group_id."' AND latest = 1");
+
+			if(count($group_stu)){
+				$grp_students = "<option value='whole_group'>Whole Group</option>";
+				
+				foreach($group_stu as $gs){
+					$grp_students .= "<option value='".$gs->user_id."'>".$gs->first_name." ".$gs->last_name."</option>";
+				}
+			}
+		}
+
+		$retAry['group_students'] = $grp_students;
+	}else{
+		$retAry['data_found'] = 0;
+
+		$holiday_reason = '';
+		if(count($holidayAllGrpCheck)){
+			foreach($holidayAllGrpCheck as $holi){
+				if($holiday_reason == ''){
+					$holiday_reason = $holi->reason;
+				}else{
+					$holiday_reason = $holiday_reason.', '.$holi->reason;
+				}
+			}
+		}elseif(count($holidaySpecGrpCheck)){ 
+			foreach($holidaySpecGrpCheck as $holi){
+				if($holiday_reason == ''){
+					$holiday_reason = $holi->reason;
+				}else{
+					$holiday_reason = $holiday_reason.', '.$holi->reason;
+				}
+			}
+		}
+
+		//$sheet ='<div class="label label-danger">Holiday: '.$holiday_reason."</div>";
+		//$sheet ='<div class="label label-danger">There is no class today because of: '.$holiday_reason."</div>";
+		//$sheet ='<div class="alert alert-default">There is no class today because of: '.$holiday_reason."</div>";
+		//$sheet ='<div class="alert alert-danger">'.$holiday_reason.' : There is no class today</div>';
+		//$sheet = '<h4>There is no class today because of '.$holiday_reason.'</h4>';
+		//$sheet ='<div class="alert alert-default"><h4>There is no class today because of '.$holiday_reason.'</h4></div>';
+		$sheet ='<div class="alert alert-default"><h5>'.$holiday_reason.' : There is no class today</h5></div>';
+		//$sheet = 'Oops! There is class today. Reason is '.strtolower($holiday_reason);
+	}
+	
+	$retAry['sheet'] = $sheet;	
+	
+	echo json_encode($retAry);
+	exit;
+}
+
+//==========================DISPLAY ATTENDANCE OF FAMILY=====================
+elseif($_POST['action'] == 'get_attendance_of_family'){ 
+	$retAry = array();
+
+	$group_id = $_POST['group'];
+	$class_id = $_POST['group_class'];
+
+	$period = explode('-',$_POST['period']);
+	$month =  $period[0];
+	$year =  $period[1];
+
+	//CHECK - IS CURRENT MONTH
+	if(date('m') == $month){
+		$lastDateOfMonth = date('d');
+	}else{
+		$lastDateOfMonth = date('t',strtotime($year.'-'.$month.'-01'));		
+	}
+
+
+    $begin = date("$year-$month-01");
+	$end = date("$year-$month-$lastDateOfMonth");
+
+	 $school_days = $db->get_row("select school_opening_days from ss_client_settings where status = 1 ");
+	 $serdays = unserialize($school_days->school_opening_days);
+
+
+	 $days_array = [];
+	 foreach($serdays as $row){
+
+		$startDate = new DateTime($begin);
+		$endDate = new DateTime($end);
+
+		while ($startDate <= $endDate) {
+			if ($startDate->format('w') == $row) {
+				 $days_array[] = $startDate->format('d');
+				//array_push($days_array,$day);
+			}
+		 $startDate->modify('+1 day');
+		}
+
+    }
+
+
+
+	
+	$table_header = '<table class="table table-bordered" id="attendance_sheet"><thead>';
+	
+	/*for($d = 1; $d <= 31; $d++){
+		$time = mktime(12, 0, 0, $month, $d, $year);          
+		if (date('m', $time) == $month && date('Y-m-d',$time) <= date('Y-m-d')){      
+			$table_header .= '<th>'.date('d D', $time).'</th>';
+		}
+	}*/
+	
+	//COMMENTED ON 13-MAR-2021
+	// $family_stu = $db->get_results("select user_id, CONCAT(first_name,' ',COALESCE(middle_name,''),' ',COALESCE(last_name,'')) AS student_name 
+	// from ss_student s inner join ss_user u on s.user_id = u.id where family_id = '".$_SESSION['icksumm_uat_login_familyid']."'  AND u.session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' 
+	// and u.is_active = 1 group by user_id ");
+
+	//ADDED ON 13-MAR-2021
+	$family_stu = $db->get_results("select user_id, CONCAT(first_name,' ',COALESCE(middle_name,''),' ',COALESCE(last_name,'')) AS student_name 
+	from ss_student s inner join ss_user u on s.user_id = u.id INNER JOIN ss_student_session_map ssm ON ssm.student_user_id = u.id 
+	INNER JOIN ss_studentgroupmap m ON m.student_user_id = u.id 
+	where family_id = '".$_SESSION['icksumm_uat_login_familyid']."'  AND ssm.session_id = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' 
+	and u.is_active = 1 AND m.class_id = '". $class_id."' AND m.group_id = '".$group_id."' group by user_id ");
+
+	if(count($family_stu)){
+		$retAry['data_found'] = 1;
+		
+		$table_row .= '<tr><td><strong>Date</strong></td>';	
+		foreach($family_stu as $stu){
+			$table_row .= '<td><strong>';
+			$table_row .= $stu->student_name;
+			$table_row .= '</strong></td>';
+		}
+		$table_row .= '</tr>';
+
+
+
+	for($d = 0; $d < $lastDateOfMonth; $d++){
+		$ddadd = $d+1;
+		$dd = str_pad($ddadd, 2, '0', STR_PAD_LEFT);
+		$time = mktime(12, 0, 0, $month, $dd, $year);  
+		
+		if (date('m', $time) == $month){
+			if(in_array($dd, $days_array)){
+	
+		// for($d = 1; $d <= $lastDateOfMonth; $d++){
+		// 	$time = mktime(12, 0, 0, $month, $d, $year); 
+		// 	if(date('D', $time) == 'Sun'){
+				$table_row .= '<tr>';
+				$table_row .= '<td>'.date('d D', $time).'</td>';
+				
+				if (date('m', $time) == $month && date('Y-m-d',$time) <= date('Y-m-d')){      
+					foreach($family_stu as $stu){
+						
+						$table_row .= '<td>';
+
+						$student_group_map_id = $db->get_var("select id from ss_studentgroupmap where latest = 1 
+						AND session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' and 
+						group_id='".$group_id."' and class_id='".$class_id."' and student_user_id = '".$stu->user_id."'");
+						
+						//REPLACE date('w') WITH 0 FOR TESTING
+						$classtime_id = $db->get_var("select id from ss_classtime where class_id = '".$class_id."' 
+						AND session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' and group_id = '".$group_id."'");
+
+						$atten_info = $db->get_row("select * from ss_attendance where student_user_id='".$stu->user_id."' 
+						and session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."'
+						and attendance_date='".date('Y-m-d',$time)."' and student_group_map_id='".$student_group_map_id."' and classtime_id='".$classtime_id."'"); 
+											
+						if(count($atten_info)){
+							if($atten_info->is_present == 1){
+								$table_row .= '<span class="label label-success">Present</span>';
+							}elseif($atten_info->is_present == 0){
+								$table_row .= '<span class="label label-danger">Absent</span>';
+							}elseif($atten_info->is_present == 2){
+								$table_row .= '<span class="label label-warning" style="background-color: #fff822;border-color: #fff822;color:#333">Late</span>';
+							}elseif($atten_info->is_present == -1){
+                                $table_row .= " ";
+							}
+						}else{
+							$table_row .= "-";
+						}
+						
+						$table_row .= '</td>';
+					}
+				}
+
+				$table_row .= '</tr>';
+			}
+		}
+	 }			
+
+		$table_row .= '</thead></table>';
+	}else{
+		$retAry['data_found'] = 0;
+	}
+	
+	$sheet = '<table class="table table-bordered" id="attendance_sheet"><thead><tr>'.$table_header.'</tr></thead>';
+	$sheet .= '<tbody>'.$table_row.'</tbody>';
+	$sheet .= '</table>';
+	
+	if($retAry['data_found'] == 0){
+		$sheet .= '<div>No record found</div>';
+	}
+	
+	$retAry['sheet'] = $sheet;
+	
+	echo json_encode($retAry);
+	exit;
+}
+
+//==========================SAVE ATTENDANCE=====================
+elseif($_POST['action'] == 'save_attendance'){
+	$group_id = $_POST['group_id'];
+	$class_id = $_POST['class_id'];
+
+
+	//$classtime_id = $db->get_var("select id from ss_classtime where is_active = 1 and group_id='".$group_id."' and class_id = '".$class_id."' and day_number = '".$attendance_day_number."'");
+
+	// $classtime_id = $db->get_var("select id from ss_classtime where is_active = 1 and group_id='".$group_id."' and class_id = '".$class_id."' and day_number='".date('w')."' and session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' ");
+
+	$classtime_id = $db->get_var("select id from ss_classtime where is_active = 1 and group_id='".$group_id."' and class_id = '".$class_id."' 
+	and session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' ");
+
+
+	foreach($_POST['attendance'] as $key => $val){
+		$userid = $key;
+
+		$student_group_map_id = $db->get_var("select id from ss_studentgroupmap where latest = 1 and session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' 
+		and group_id='".$group_id."' and class_id='".$class_id."' and student_user_id = '".$userid."'");
+
+		foreach($val as $inner_key => $inner_val){ 
+			$attendance_date = $inner_key;
+			$is_present = $inner_val;
+			
+		 if($is_present != '-1'){
+
+		 	$attendance_rs = $db->get_row("select * from ss_attendance where student_user_id='".$userid."' 
+			 and session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."'
+			and DATE_FORMAT(attendance_date, '%Y-%m-%d') = '".$attendance_date."' and classtime_id='".$classtime_id."'");
+
+			if(count($attendance_rs)){
+				if(check_userrole_by_code('UT01')){
+					$sql_ret = $db->query("update ss_attendance set attendance_date='".$attendance_date."',				
+					is_present='".$is_present."', updated_by_user_id = '".$_SESSION['icksumm_uat_login_userid']."', 
+					updated_on='".date('Y-m-d H:i:s')."' where id = '".$attendance_rs->id."'"); 
+				}
+			}else{
+				$sql_ret = $db->query("insert into ss_attendance set student_user_id='".$userid."',
+				attendance_date='".$attendance_date."', student_group_map_id='".$student_group_map_id."',classtime_id='".$classtime_id."',
+				session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."',
+				is_present='".$is_present."',created_by_user_id = '".$_SESSION['icksumm_uat_login_userid']."', 
+				created_on='".date('Y-m-d H:i:s')."', updated_by_user_id = '".$_SESSION['icksumm_uat_login_userid']."', 
+				updated_on='".date('Y-m-d H:i:s')."'"); 
+			}
+
+		}
+
+		}
+	}
+	
+	if($sql_ret){
+		echo json_encode(array('code' => "1",'msg' => 'Attendance saved successfully'));
+		exit;
+	}else{
+		echo json_encode(array('code' => "0",'msg' => 'Attendance not saved'));
+		exit;
+	}
+}
+
+?>

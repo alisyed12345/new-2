@@ -1,0 +1,1 @@
+INSERT INTO ss_config SET KEY='BEST_REGARDS_TEXT', VALUE='Thanks';

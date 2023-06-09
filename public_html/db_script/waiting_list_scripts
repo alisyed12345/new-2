@@ -1,0 +1,2 @@
+ALTER TABLE `ss_client_settings` ADD `is_waiting` TINYINT(1) NOT NULL DEFAULT '0' AFTER `reg_form_term_cond_attach_url`;
+ALTER TABLE `ss_sunday_school_reg` ADD `is_waiting` TINYINT(1) NOT NULL DEFAULT '0' AFTER `session`;

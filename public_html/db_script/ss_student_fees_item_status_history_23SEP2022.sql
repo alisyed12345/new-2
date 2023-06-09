@@ -1,0 +1,1 @@
+ALTER TABLE ss_student_fees_item_status_history  ADD schedule_payment_date DATE NULL  AFTER created_by_user_id;

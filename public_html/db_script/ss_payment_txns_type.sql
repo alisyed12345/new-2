@@ -1,0 +1,2 @@
+ALTER TABLE `ick_saturday_academy`.`ss_payment_txns`   
+  ADD COLUMN `is_payment_type` TINYINT(6) DEFAULT 0 NULL COMMENT 'reg_internal=1, reg_external=2, schedule_pay=3, manual_pay=4, wallet_transaction=5, refund=6' AFTER `payment_date`;

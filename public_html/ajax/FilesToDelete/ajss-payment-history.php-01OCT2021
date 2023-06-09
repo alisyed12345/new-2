@@ -1,0 +1,468 @@
+<?php 
+    include_once "../includes/config.php";
+    include_once "../includes/FortePayment.class.php";
+    $forte_configarray = array(
+        'FORTE_API_ACCESS_ID' => FORTE_API_ACCESS_ID, 
+        'FORTE_API_SECURITY_KEY' => FORTE_API_SECURITY_KEY, 
+        'FORTE_ORGANIZATION_ID' => FORTE_ORGANIZATION_ID,
+        'FORTE_LOCATION_ID' => FORTE_LOCATION_ID,
+        'ENVIRONMENT' => ENVIRONMENT, 
+    );
+    $fortePayment = new FortePayment($forte_configarray);
+
+        //AUTHARISATION CHECK
+    if(!isset($_SESSION['icksumm_uat_login_userid'])){
+        return;
+    }
+
+    //==========================LIST ALL SCHEDULE FOR ADMIN=====================
+     if($_POST['action'] == 'list_history_payments'){
+         $finalAry = array();
+         $user_id = trim($_POST['user_id']);
+
+         $default_credit_card = $db->get_var("SELECT credit_card_no FROM ss_paymentcredentials WHERE family_id = '".$user_id."' 
+         AND default_credit_card = 1");
+
+        //if (!empty($user_id)) {
+        //    $all_student_fees_items = $db->get_results("SELECT sfi.id AS sch_item_id,sfi.original_schedule_payment_date, sfi.schedule_payment_date, SUM(sfi.amount) AS final_amount, sfi.schedule_status, s.family_id, s.user_id,  f.father_first_name, f.father_last_name, f.father_phone, f.primary_email, pay.credit_card_no, t.payment_unique_id FROM 
+        //    ss_student_fees_items sfi
+        //    INNER JOIN ss_student s ON sfi.student_user_id = s.user_id
+        //    INNER JOIN ss_user u ON u.id = s.user_id
+        //    INNER JOIN ss_family f ON f.id = s.family_id
+        //    INNER JOIN ss_paymentcredentials pay ON pay.family_id = s.family_id
+        //    LEFT JOIN ss_student_fees_transactions ON ss_student_fees_transactions.student_fees_item_id = sfi.id
+        //    LEFT JOIN ss_payment_txns t ON t.id = ss_student_fees_transactions.payment_txns_id
+        //    WHERE s.family_id = '".$user_id."' AND u.is_active = 1 AND u.is_deleted = 0 AND pay.default_credit_card =1 GROUP BY sfi.original_schedule_payment_date,schedule_status,payment_unique_id ORDER BY  sfi.original_schedule_payment_date ASC", ARRAY_A);
+       // }
+
+       //COMMENTED BY UROOJ ON 22-SEP-2021
+        // $all_student_fees_items = $db->get_results("SELECT sfi.id AS sch_item_id, u.is_active, sfi.original_schedule_payment_date, 
+        // sfi.schedule_payment_date, SUM(sfi.amount) AS final_amount, sfi.schedule_status, s.family_id, s.user_id,  f.father_first_name, 
+        // f.father_last_name, f.father_phone, f.primary_email, pay.credit_card_no FROM 
+        // ss_student_fees_items sfi
+        // INNER JOIN ss_student s ON sfi.student_user_id = s.user_id
+        // INNER JOIN ss_user u ON u.id = s.user_id
+        // INNER JOIN ss_student_session_map ssm ON ssm.student_user_id = u.id
+        // INNER JOIN ss_family f ON f.id = s.family_id
+        // INNER JOIN ss_paymentcredentials pay ON pay.family_id = s.family_id
+        // WHERE s.family_id = '".$user_id."' AND sfi.session='".$_SESSION['icksumm_uat_CURRENT_SESSION']."' AND u.is_deleted = 0 
+        // AND pay.default_credit_card =1 
+        // GROUP BY sfi.original_schedule_payment_date ORDER BY  sfi.original_schedule_payment_date ASC", ARRAY_A);
+
+        //ADDED BY UROOJ ON 22-SEP-2021
+       $all_student_fees_items = $db->get_results("SELECT distinct sfi.id AS sch_item_id, u.is_active, sfi.original_schedule_payment_date, 
+       sfi.schedule_payment_date, SUM(sfi.amount) AS final_amount, sfi.schedule_status, s.family_id, s.user_id,  f.father_first_name, 
+       f.father_last_name, f.father_phone, f.primary_email FROM 
+        ss_student_fees_items sfi
+        INNER JOIN ss_student s ON sfi.student_user_id = s.user_id
+        INNER JOIN ss_user u ON u.id = s.user_id
+        INNER JOIN ss_student_session_map ssm ON ssm.student_user_id = u.id
+        INNER JOIN ss_family f ON f.id = s.family_id
+        INNER JOIN ss_paymentcredentials pay ON pay.family_id = s.family_id
+        WHERE s.family_id = '".$user_id."' AND sfi.session='".$_SESSION['icksumm_uat_CURRENT_SESSION']."' 
+        AND u.is_deleted = 0
+        GROUP BY sfi.original_schedule_payment_date, sfi.schedule_status, pay.id 
+        ORDER BY sfi.id ASC", ARRAY_A);
+
+       
+       for($i=0; $i<count($all_student_fees_items); $i++){
+
+
+        $trxn_child_names = $db->get_results("SELECT s.first_name FROM ss_student_fees_items sfi
+        INNER JOIN ss_student s ON sfi.student_user_id = s.user_id  INNER JOIN ss_family f ON f.id = s.family_id WHERE  sfi.schedule_payment_date = '".$all_student_fees_items[$i]['schedule_payment_date']."' AND s.family_id = '".$user_id."' GROUP BY s.user_id");
+
+         $child_name = "";
+         foreach ($trxn_child_names as $row) {
+            $child_name.= $row->first_name.", ";
+         }
+
+         $payment_trxn = $db->get_row("SELECT payment_txns_id,payment_date, pay.credit_card_no,payment_unique_id FROM ss_student_fees_transactions 
+                                    INNER JOIN ss_payment_txns ON ss_payment_txns.id = ss_student_fees_transactions.payment_txns_id 
+                                    INNER JOIN ss_paymentcredentials pay ON pay.id = ss_payment_txns.payment_credentials_id
+                                    WHERE student_fees_item_id = '".$all_student_fees_items[$i]['sch_item_id']."' 
+                                    ORDER BY ss_student_fees_transactions.id DESC LIMIT 1");
+
+       
+        $star = '************';
+        $all_student_fees_items[$i]['parent_name'] =  $all_student_fees_items[$i]['father_first_name'].' '.$all_student_fees_items[$i]['father_last_name'];
+        if($all_student_fees_items[$i]['original_schedule_payment_date'] == $all_student_fees_items[$i]['schedule_payment_date']){
+            $all_student_fees_items[$i]['schedule_payment_date'] =  date('m/d/Y', strtotime($all_student_fees_items[$i]['schedule_payment_date']));
+        }else{
+            $all_student_fees_items[$i]['schedule_payment_date'] =  date('m/d/Y', strtotime($all_student_fees_items[$i]['schedule_payment_date'])). " <b>( Prev. ".date('m/d/Y', strtotime($all_student_fees_items[$i]['original_schedule_payment_date']))."  )</b>";
+        }
+
+        $all_student_fees_items[$i]['sch_payment_date'] = date('m/d/Y', strtotime($all_student_fees_items[$i]['original_schedule_payment_date']));
+       
+
+        if($all_student_fees_items[$i]['schedule_status'] == 1){
+            $all_student_fees_items[$i]['payment_trxn_status'] = 'Success';
+         }elseif($all_student_fees_items[$i]['schedule_status'] == 2){
+            $all_student_fees_items[$i]['payment_trxn_status'] = 'Cancel';
+         }elseif($all_student_fees_items[$i]['schedule_status'] == 3){
+            $all_student_fees_items[$i]['payment_trxn_status'] = 'Hold';
+         }elseif($all_student_fees_items[$i]['schedule_status'] == 4){
+            $all_student_fees_items[$i]['payment_trxn_status'] = 'Skipped';
+         }elseif($all_student_fees_items[$i]['schedule_status'] == 0){
+            $all_student_fees_items[$i]['payment_trxn_status'] = 'Pending';
+         }else{
+            $all_student_fees_items[$i]['payment_trxn_status'] = '';
+         }
+
+            if(!empty($payment_trxn->credit_card_no) && $all_student_fees_items[$i]['payment_trxn_status'] == 'Success'){
+                $credit_card_number = $star.substr(str_replace(' ', '', base64_decode($payment_trxn->credit_card_no)), -4);
+            }elseif(($payment_trxn->credit_card_no) && $all_student_fees_items[$i]['payment_trxn_status'] == 'Skipped'){
+                $credit_card_number = $star.substr(str_replace(' ', '', base64_decode($payment_trxn->credit_card_no)), -4);
+            }else{
+                //$credit_card_number = $star.substr(str_replace(' ', '', base64_decode($all_student_fees_items[$i]['credit_card_no'])), -4);
+                $credit_card_number = $star.substr(str_replace(' ', '', base64_decode($default_credit_card)), -4);
+            }
+
+
+            if(!empty($payment_trxn->payment_date) && $all_student_fees_items[$i]['payment_trxn_status'] != 'Pending'){
+                $all_student_fees_items[$i]['payment_date'] =  date('m/d/Y', strtotime($payment_trxn->payment_date));
+            }else{
+                $all_student_fees_items[$i]['payment_date'] = "";
+            }
+
+
+            if(!empty($payment_trxn->payment_date) && $all_student_fees_items[$i]['payment_trxn_status'] != 'Pending'){
+                $all_student_fees_items[$i]['payment_unique_id'] =  $payment_trxn->payment_unique_id;
+            }else{
+                $all_student_fees_items[$i]['payment_unique_id'] = "";
+            }
+
+       
+
+        if(isset($payment_trxn->payment_txns_id)){
+            $all_student_fees_items[$i]['payment_txns_id'] = $payment_trxn->payment_txns_id;
+        }else{
+            $all_student_fees_items[$i]['payment_txns_id'] = null;
+        }
+
+        $all_student_fees_items[$i]['credit_card_no'] = $credit_card_number;
+        $all_student_fees_items[$i]['final_amount'] = '$'.($all_student_fees_items[$i]['final_amount'] + 0);
+        $all_student_fees_items[$i]['child_name'] = rtrim($child_name, ', ');
+         
+       }
+
+
+        $finalAry['data'] = $all_student_fees_items;
+		echo json_encode($finalAry);
+		exit;
+
+
+
+    }elseif($_POST['action'] == 'sendInvoice'){ 
+
+
+        
+        $user_id = trim($_POST['stu_user_id']);
+        $family_id = trim($_POST['family_id']);
+        $payment_txns_id = trim($_POST['trxn_id']);
+        $email = trim($_POST['email']);
+
+       //if (!empty($user_id)) {
+         $user_payment_txn = $db->get_row("SELECT sft.payment_txns_id, ptx.payment_unique_id, ptx.payment_date, sum(sfi.amount) as final_amount, f.father_first_name, f.father_last_name, f.father_phone, f.primary_email, s.family_id, s.user_id, pay.credit_card_no FROM ss_payment_txns ptx  
+         INNER JOIN ss_student_fees_transactions sft ON sft.payment_txns_id = ptx.id 
+         INNER JOIN ss_student_fees_items sfi ON sfi.id = sft.student_fees_item_id 
+         INNER JOIN ss_student s ON sfi.student_user_id = s.user_id
+         INNER JOIN ss_user u ON u.id = s.user_id
+         INNER JOIN ss_student_session_map ssm ON ssm.student_user_id = u.id
+         INNER JOIN ss_family f ON f.id = s.family_id
+         INNER JOIN ss_paymentcredentials pay ON pay.id = ptx.payment_credentials_id
+         WHERE sft.payment_txns_id = '".$payment_txns_id."' AND u.is_active = 1 AND u.is_deleted = 0 ");
+     // }
+
+
+
+      $trxn_child_names = $db->get_results("select s.first_name from ss_student_fees_transactions sft
+       INNER JOIN ss_student_fees_items sfi ON sfi.id = sft.student_fees_item_id 
+       INNER JOIN ss_student s ON sfi.student_user_id = s.user_id where  sft.payment_txns_id='".$payment_txns_id."' GROUP BY s.user_id ");
+
+       $child_name = "";
+       foreach ($trxn_child_names as $row) {
+          $child_name.= $row->first_name.", ";
+       }
+
+       
+        $star = '************';
+        $payment_date_formate =  date('F Y', strtotime($user_payment_txn->payment_date));
+        $payment_date = date('m/d/Y', strtotime($user_payment_txn->payment_date));
+        $credit_card_no = $star.substr(str_replace(' ', '', base64_decode($user_payment_txn->credit_card_no)), -4);
+        $final_amount = '$'.($user_payment_txn->final_amount + 0);
+        $child_name = rtrim($child_name, ', ');
+
+
+        $emailbody_support .= '<table style="width:100%; cellpadding:0px; border:0;" cellpadding="0">
+                <tr>
+                <td colspan="2" style="text-align: center;">
+                    <div style="font-size: 30px; text-align:center;"><u>RECEIPT</u></div>
+                </td>
+            </tr>   
+            <tr>
+        <td colspan="2" style="text-align: left; padding-top:30px">
+        <table style="width:100%; cellpadding:0px; border:0;" cellspacing="10"><tr><td style="width: 25%;" class="color2">Parent Name:</td><td style="width: 75%; text-align:left;">'.$user_payment_txn->father_first_name.' '.$user_payment_txn->father_last_name.'</td></tr><tr><td style="width: 25%;" class="color2">Phone
+            Number:</td><td style="width: 75%; text-align:left;">'.$user_payment_txn->father_phone.'</td></tr>
+    <tr><td style="width: 25%;" class="color2">Email:</td><td style="width: 75%; text-align:left;"> '.$user_payment_txn->primary_email.' </td></tr><tr><td style="width: 25%;" class="color2"> Child(ren) Name:</td><td style="width: 75%; text-align:left;">'.$child_name.'</td></tr>
+
+        <tr><td style="width: 25%;" class="color2">Payment Transaction ID:</td>
+            <td style="width: 75%; text-align:left;">'.$user_payment_txn->payment_unique_id.'
+            </td></tr>
+
+            <tr><td style="width: 25%;" class="color2">Last 4 Digits of Credit Card:</td>
+            <td style="width: 75%; text-align:left;">'.$credit_card_no.'
+            </td></tr>
+            
+        <tr><td style="width: 25%;" class="color2">Paid
+                Amount:</td> 
+            <td style="width: 75%; text-align:left;">'.$final_amount.'</td></tr>
+        <tr><td style="width: 25%;" class="color2">Payment
+                Date:</td>
+            <td style="width: 75%; text-align:left;">'.$payment_date.'
+                </td></tr>
+            </table>
+            </td>
+        </tr>          
+    </table>';
+                                     
+    $res = send_my_mail($email, CENTER_SHORTNAME.' '.SCHOOL_NAME.' Payment Receipt', $emailbody_support);                             
+
+        if($res == true){
+            echo json_encode(array('code' => "1",'msg' => 'Receipt sent successfully'));
+        }else{
+            $return_resp = array('code' => "0",'msg' => 'Receipt not sent. Please try later.', 'err_pos' => 1);
+            CreateLog($_REQUEST, json_encode($return_resp));
+            echo json_encode($return_resp);
+            exit;
+        }
+    
+    
+    exit;
+}
+
+
+
+
+elseif($_POST['action'] == 'status_cancel_all_schedule'){
+
+    $db->query('BEGIN');
+    $family_id = trim($_POST['user_id']);
+    $reason = $_POST['reason'];
+    
+    $students = $db->get_results("select s.user_id, s.first_name, s.last_name from ss_student s inner join ss_user u on u.id = s.user_id INNER JOIN ss_student_session_map ssm ON ssm.student_user_id = u.id where s.family_id= '" . $family_id . "' AND u.is_locked=0 AND u.is_active=1 and u.is_deleted = 0 and ssm.session_id = '" . $_SESSION['icksumm_uat_CURRENT_SESSION'] . "' ");
+   
+    $stu_names = "";
+    foreach($students as $row){
+    $user_id = $row->user_id;  
+    
+
+    $sql_ret = $db->get_results("select id from ss_student_fees_items  where (schedule_status = 0 OR schedule_status = 3) and student_user_id='".$user_id."' ");
+    if (!empty($sql_ret)) {
+       foreach ($sql_ret as $result) {
+               $student_fees_items = $db->query("insert into ss_student_fees_item_status_history set student_fees_items_id='".$result->id."', current_status = 0, new_status=2, comments = '".$reason."', created_by_user_id='".$_SESSION['icksumm_uat_login_userid']."', created_at = '".date('Y-m-d H:i')."'");
+       }
+    $stu_names .= $row->first_name . ' ' . $row->last_name . ", ";
+    }
+
+    $sql_ret = $db->query("update ss_student_fees_items set schedule_status = 2 where (schedule_status = 0 OR schedule_status = 3) and student_user_id='".$user_id."' ");
+    }
+    
+    $family_data  = $db->get_row("SELECT * FROM ss_student s inner join ss_family f on f.id = s.family_id where f.id = ".$family_id." ");
+    
+    if($student_fees_items){
+
+                $emailbody_support .= "Assalamu-alaikum ".$family_data->father_first_name.' '.$family_data->father_last_name.",<br>";
+                 $emailbody_support .= CENTER_SHORTNAME.' '.SCHOOL_NAME." Cancelation Payment Information:<br><br>";
+     
+                 $emailbody_support .= '<table style="width:100%; cellpadding:0px; border:0;" cellpadding="0">
+                     <tr>
+                     <td colspan="2" style="text-align: center;">
+                             <div style="font-size: 18px;margin-top:30px; text-align:left;"><u> Payment Schedule Cancelation Information </u></div>
+                         </td>
+                     </tr>   
+                     <tr>
+                     <td colspan="2" style="text-align: left; padding-top:10px">
+                     <table style="width:100%; cellpadding:0px; border:0;" cellspacing="3">
+ 
+                     <tr><td style="width: 25%;" class="color2"> Child(ren) Name:</td>
+                     <td style="width: 75%; text-align:left;">'.rtrim($stu_names, ", ").'
+                     </td></tr>
+ 
+                     <tr><td style="width: 25%;" class="color2"> Payment Schedule Status:</td>
+                     <td style="width: 75%; text-align:left;"> Cancel
+                     </td></tr>
+
+                     <tr><td style="width: 25%;" class="color2"> Comment:</td>
+                     <td style="width: 75%; text-align:left;">'.$reason.'
+                     </td></tr>
+                     </table>
+                     </td>
+                     </tr>         
+                     </table>';
+ 
+ 
+                 $emailbody_support .= "<br><br>Thanks";
+                 $emailbody_support .= "<br>Islamic Center of Kansas";  
+                 $emailbody_support .= "<br><br>For any comments or question, please send email to <a href='mailto:".SCHOOL_GEN_EMAIL."'> ".SCHOOL_GEN_EMAIL." </a>";
+                 $emailbody_support .= "<br> You agreed to give us consent to authorize electronic fund transfer from the account specified above for the transaction.";
+
+             if(!empty($family_data->secondary_email)){
+                 send_my_mail($family_data->secondary_email, CENTER_SHORTNAME.' '.SCHOOL_NAME.' Payment Schedule Cancelation Information', $emailbody_support);
+             } 
+             if(!empty($family_data->primary_email)){
+                 send_my_mail($family_data->primary_email, CENTER_SHORTNAME.' '.SCHOOL_NAME.' Payment Schedule Cancelation Information', $emailbody_support);
+             } 
+     
+
+        $db->query('COMMIT');
+            echo json_encode(array('code' => "1",'msg' => '<p class="text-success"> update successfully </p>'));
+         exit;
+
+    }else{
+
+         $db->query('ROLLBACK');
+      echo json_encode(array('code' => "0",'msg' => 'Process failed','_errpos' => '1'));
+      exit;
+
+    }
+
+   
+}
+
+
+
+
+elseif($_POST['action'] == 'status_schedule_save'){
+
+        $db->query('BEGIN');
+
+        $family_id = trim($_POST['user_id']);
+        $sch_pay_date = Date('Y-m-d', strtotime($_POST['sch_pay_date']));
+
+        $current_status_post = strtolower($_POST['current_status']);
+        $schedule_status_post = strtolower($_POST['schedule_status']);
+
+        if($current_status_post == 'success'){
+            $current_status = 1;
+            }elseif($current_status_post == 'cancel'){
+            $current_status = 2;
+            }elseif($current_status_post == 'hold'){
+            $current_status = 3;
+            }elseif($current_status_post == 'skiped'){
+            $current_status = 4;
+            }elseif($current_status_post == 'pending'){
+                $current_status = 0;
+            }
+
+            if($schedule_status_post == 'success'){
+            $new_status = 1;
+            }elseif($schedule_status_post == 'cancel'){
+            $new_status = 2;
+            }elseif($schedule_status_post == 'hold'){
+            $new_status = 3;
+            }elseif($schedule_status_post == 'skiped'){
+            $new_status = 4;
+            }elseif($schedule_status_post == 'pending'){
+                $new_status = 0;
+            }elseif($schedule_status_post == 'resume'){
+                $new_status = 0;
+            }
+
+            $fee_amount = $_POST['fee_amount'];
+            $reason = $_POST['reason'];
+
+            $sch_payment_items = $db->get_results("select i.id,i.student_user_id,i.schedule_payment_date,i.schedule_status from ss_student_fees_items i inner join ss_student s on s.user_id = i.student_user_id where i.original_schedule_payment_date='".$sch_pay_date."' and s.family_id='".$family_id."' AND  (schedule_status = 0 OR schedule_status = 3) ");
+     
+            foreach($sch_payment_items as $sch_items){
+
+
+                if($schedule_status_post == 'resume' && $sch_items->schedule_payment_date < date('Y-m-d')){
+
+                    $next_payment_date = $db->get_var("SELECT schedule_payment_date FROM ss_student_fees_items WHERE student_user_id = '".$sch_items->student_user_id."' AND schedule_status=0 ORDER BY original_schedule_payment_date ASC");
+
+                    $sql_ret = $db->query("update ss_student_fees_items set  schedule_payment_date='".$next_payment_date."' , schedule_status='".$new_status."' where id='".$sch_items->id."' and student_user_id='".$sch_items->student_user_id."' ");
+                    $student_fees_items = $db->query("insert into ss_student_fees_item_status_history set student_fees_items_id='".$sch_items->id."', current_status = '".$current_status."', new_status='".$new_status."', comments = '".$reason."', created_by_user_id='".$_SESSION['icksumm_uat_login_userid']."', created_at = '".date('Y-m-d H:i')."'");
+
+                }else{
+
+                    $sql_ret = $db->query("update ss_student_fees_items set schedule_status='".$new_status."' where id='".$sch_items->id."' and student_user_id='".$sch_items->student_user_id."' ");
+                    $student_fees_items = $db->query("insert into ss_student_fees_item_status_history set student_fees_items_id='".$sch_items->id."', current_status = '".$current_status."', new_status='".$new_status."', comments = '".$reason."', created_by_user_id='".$_SESSION['icksumm_uat_login_userid']."', created_at = '".date('Y-m-d H:i')."'");
+
+                }
+
+            }
+
+
+            $family_data  = $db->get_row("SELECT * FROM ss_student s inner join ss_family f on f.id = s.family_id where  f.id = ".$family_id." ");
+
+             $emailbody_support .= "Assalamu-alaikum ".$family_data->father_first_name.' '.$family_data->father_last_name.",<br>";
+             $emailbody_support .= CENTER_SHORTNAME.' '.SCHOOL_NAME." Payment Information:<br><br>";
+ 
+             $emailbody_support .= '<table style="width:100%; cellpadding:0px; border:0;" cellpadding="0">
+                 <tr>
+                 <td colspan="2" style="text-align: center;">
+                         <div style="font-size: 18px;margin-top:30px; text-align:left;"><u>Payment Schedule Information </u></div>
+                     </td>
+                 </tr>   
+                 <tr>
+                 <td colspan="2" style="text-align: left; padding-top:10px">
+                 <table style="width:100%; cellpadding:0px; border:0;" cellspacing="3">
+
+                 <tr><td style="width: 25%;" class="color2"> Child(ren) Name:</td>
+                 <td style="width: 75%; text-align:left;">'.$family_data->first_name.' '.$family_data->last_name.'
+                 </td></tr>
+
+                 <tr><td style="width: 25%;" class="color2">Payment Schedule Date:</td>
+                 <td style="width: 75%; text-align:left;">'.date('m/d/Y', strtotime($sch_pay_date)).'
+                 </td></tr>
+                     
+                 <tr><td style="width: 25%;" class="color2">Amount:</td> 
+                     <td style="width: 75%; text-align:left;">'.$fee_amount.'</td></tr>
+
+                 <tr><td style="width: 25%;" class="color2"> Payment Schedule Old Status:</td>
+                 <td style="width: 75%; text-align:left;">'.$_POST['current_status'].'
+                 </td></tr>
+
+                 <tr><td style="width: 25%;" class="color2"> Payment Schedule New Status:</td>
+                 <td style="width: 75%; text-align:left;">'.$_POST['schedule_status'].'
+                 </td></tr>
+
+                 <tr><td style="width: 25%;" class="color2"> Comment:</td>
+                 <td style="width: 75%; text-align:left;">'.$reason.'
+                 </td></tr>
+                 </table>
+                 </td>
+                 </tr>         
+                 </table>';
+
+
+             $emailbody_support .= "<br><br>Thanks";
+             $emailbody_support .= "<br>Islamic Center of Kansas";  
+             $emailbody_support .= "<br><br>For any comments or question, please send email to <a href='mailto:".SCHOOL_GEN_EMAIL."'> ".SCHOOL_GEN_EMAIL." </a>";
+             $emailbody_support .= "<br> You agreed to give us consent to authorize electronic fund transfer from the account specified above for the transaction.";
+
+         if(!empty($family_data->secondary_email)){
+             send_my_mail($family_data->secondary_email, CENTER_SHORTNAME.' '.SCHOOL_NAME.' Payment Schedule Information', $emailbody_support);
+         } 
+         if(!empty($family_data->primary_email)){
+             send_my_mail($family_data->primary_email, CENTER_SHORTNAME.' '.SCHOOL_NAME.' Payment Schedule Information', $emailbody_support);
+         } 
+         
+        if($db->insert_id > 0 ){
+
+            $db->query('COMMIT');
+            echo json_encode(array('code' => "1",'msg' => '<p class="text-success"> update successfully </p>'));
+         exit;
+         }else{
+               $db->query('ROLLBACK');
+          echo json_encode(array('code' => "0",'msg' => 'Process failed','_errpos' => '2'));
+          exit;
+             
+         }
+
+
+}
+
+
+
+?>

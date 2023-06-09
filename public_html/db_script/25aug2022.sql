@@ -1,0 +1,1 @@
+ALTER TABLE ss_payment_sch_item_cron CHANGE total_amount total_amount DECIMAL(10,2) NOT NULL

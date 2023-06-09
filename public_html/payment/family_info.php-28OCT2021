@@ -1,0 +1,490 @@
+<?php 
+$mob_title = "Family Info";
+include "../header.php";
+
+if(!in_array("su_family_info", $_SESSION['login_user_permissions'])){
+  include "../includes/unauthorized_msg.php";
+exit;
+}    
+
+  ?>
+
+<style>
+    span.mands {
+    color: #ff0000;
+    display: inline;
+    line-height: 1;
+    font-size: 12px;
+    margin-left: 5px;
+   }
+</style>
+<!-- Page header -->
+
+
+
+<div class="page-header page-header-default">
+    <div class="page-header-content">
+        <div class="page-title">
+            <h4>Family Info</h4>
+        </div>
+    </div>
+    <div class="breadcrumb-line">
+        <ul class="breadcrumb">
+            <li><a href="<?php echo SITEURL ?>dashboard"><i class="icon-home2 position-left"></i>Dashboard</a></li>
+            <li class="active">Family Info</li>
+        </ul>
+    </div>
+</div>
+<!-- /page header -->
+<!-- Content area -->
+
+<div class="content">
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="panel panel-flat">
+                <div class="panel-body">
+                    <div class="col-md-12 mt-4 mt-xl-0">
+                        <h5 class="card-title"> Parent Information</h5>
+                        <div class="ajaxMsg"></div>
+                        <table class="table datatable-basic table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Family ID</th>
+                                    <th>1st parent Name</th>
+                                    <th>2nd parent Name</th>
+                                    <!-- <th>City</th> -->
+                                    <th>Phone No.</th>
+                                    <th>Primary Email</th>
+                                    <th>Next Payment</th>
+                                    <th class="text-center action_col"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+<!-- Add Modal - Staff Detail-->
+    <div id="modal_family_detail" class="modal fade">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
+                    <h5 class="modal-title" id="familyinfo_title"></h5>
+                </div>
+                <form id="frmFamilyInfo" class="form-validate-jquery" method="post">
+                    <div class="modal-body viewonly" id="family_detail"></div>
+                    <div class="modal-footer familyfoot hide">
+                        <div class="row">
+                            <div class="col-md-9">
+                                <strong id="statusMsg"></strong>
+                            </div>
+                            <div class="col-md-3">
+                                <input type="hidden" name="family_id" id="family_id">
+                                <input type="hidden" name="action" id="action" value="family_info_submit">
+                                <button type="submit" class="btn btn-success"></i> Submit</button>
+                                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <!-- /Add modal -->
+
+
+
+
+ <!-- Registraion Payment -->
+<div id="communicate_msg_email" class="modal fade">
+<div class="modal-dialog">
+  <div class="modal-content">
+    <div class="modal-header">
+      <button type="button" class="close" data-dismiss="modal">&times;</button>
+      <h5 class="modal-title" id="familyinfo_titlename">Communication</h5>
+    </div>
+    <form id="frmFamilyInfoCommunication" class="form-validate-jquery" method="post">
+        <div class="modal-body">
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="form-group">
+                      <label>Email Or Message:<span class="mands">*</span></label>
+                      <select name="communication_check" class="form-control required">
+                          <option value="">Select</option>
+                          <option value="1">Email</option>
+                          <option value="2">Text Message</option>
+                      </select>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="form-group">
+                        <label>Message:<span class="mands">*</span></label>
+                        <textarea type="text" name="communication_msg" id="maxContentPost" maxlength="120" placeholder="Communication Message" class="form-control required summernote" colspan="8" aria-required="true"></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <div class="row">
+                <div class="col-md-9">
+                    <strong id="statusMsgcomm"></strong>
+                </div>
+                <div class="col-md-3">
+                    <input type="hidden" name="father_phone_no" id="father_phone_no">
+                    <input type="hidden" name="primary_email" id="primary_email">
+                    <input type="hidden" name="family_id" id="familyid">
+                    <input type="hidden" name="action" id="action" value="family_info_communication">
+                    <button type="submit" class="btn btn-success btnsubmit"></i> Submit</button>
+                    <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </form>
+  </div>
+</div>
+</div>
+ <!-- /Registraion Payment -->
+<link href="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote.min.js"></script>
+    <script>
+        var table;
+
+        $(document).ready(function() {
+            
+            //FILL TABLE
+            fillTable();
+
+
+            //VALIDATION - digits 
+            jQuery.validator.addMethod("Digits", function(value, element) {
+                return this.optional(element) || /^((?!(0))[0-9]{1,2})$/i.test(value);
+            }, "Enter valid Quantity");
+
+
+            //FETCH STAFF DETAILS
+            $(document).on('click', '.viewdetail', function() {
+                var familyid = $(this).data('familyid');
+                var fathername = $(this).data('fathername');
+                $('#family_id').val(familyid);
+                var targetUrl = '<?php echo SITEURL ?>ajax/ajss-family';
+                $('#familyinfo_title').html(fathername + "'s Family");
+                $('#family_detail').html('<h5>Data loading... Please wait</h5>');
+                $('#modal_family_detail').modal('show');
+
+                $.post(targetUrl, {
+                    familyid: familyid,
+                    action: 'view_family_detail_payment'
+                }, function(data, status) {
+                    if (status == 'success') {
+                        $('.familyfoot').removeClass('hide');
+                        $('#family_detail').html(data);
+
+                     }
+                 });
+
+          });
+
+
+            //SCHEDULE PAYMENT
+            $(document).on('click', '.schedulePayment', function() {
+                var familyid = $(this).data('familyid');
+                var fathername = $(this).data('fathername');
+                $('#familyid').val(familyid);
+                var targetUrl = '<?php echo SITEURL ?>ajax/ajss-family';
+                $('#familyinfo_title_name').html("Schedule Payment ( " + fathername + " ) ");
+                $('#data_load').html('<h5>Data loading... Please wait</h5>');
+                $('#modalSchedulePayment').modal('show');
+
+                $.post(targetUrl, {
+                    familyid: familyid,
+                    action: 'get_stu_not_schedule'
+                }, function(data, status) {
+                    if (status == 'success') {
+
+                      if (data.code == 1) {
+                        $('.familyfooter').removeClass('hide');
+                        $('#data_load').html(data.msg);
+                        var yesterday = new Date((new Date()).valueOf() - 1000 * 60 * 60 * 24);
+                        $('#schedule_start_date').pickadate({
+                            labelMonthNext: 'Go to the next month',
+                            labelMonthPrev: 'Go to the previous month',
+                            labelMonthSelect: 'Pick a month from the dropdown',
+                            labelYearSelect: 'Pick a year from the dropdown',
+                            selectMonths: true,
+                            selectYears: true,
+                            disable: [{
+                                from: [0, 0, 0],
+                                to: yesterday
+                            }],
+                            min: [<?php echo date('Y') ?>, <?php echo date('m') - 1 ?>, <?php echo date('d') ?>],
+                            formatSubmit: 'yyyy-mm-dd'
+                        });
+
+                      }else{
+                        $('#data_load').html(data.msg);
+                      }
+
+                    }
+                  }, 'json');
+            });
+
+            $('#modalSchedulePayment').on('hide.bs.modal', function(e) {
+                $('#statusMsgs').html('');
+                $('#frmSchedulePayment').trigger('reset');
+                var validator = $("#frmSchedulePayment").validate();
+                validator.resetForm();
+            });
+
+
+
+            // SUBMIT EVENT
+            $('#frmSchedulePayment').submit(function(e) {
+                e.preventDefault();
+                if ($('#frmSchedulePayment').valid()) {
+                    $('.btnsubmit').prop("disabled", true);
+                    $('#statusMsgs').html('Processing...');
+                    var targetUrl = "<?php echo SITEURL ?>ajax/ajss-family";
+                    var formDate = $(this).serialize();
+                    $.post(targetUrl, formDate, function(data, status) {
+                        if (status == 'success') {
+                            $('.btnsubmit').prop("disabled", false);
+                            fillTable();
+                            
+                            if (data.code == 1) {
+                               $('#statusMsgs').html(data.msg);
+                                displayAjaxMsg(data.msg, data.code);
+                            } else {
+                                $('#statusMsgs').html(data.msg);
+                                displayAjaxMsg(data.msg, data.code);
+                            }
+                        } else {
+                            displayAjaxMsg(data.msg, data.code);
+                        }
+
+                    }, 'json');
+
+                    //grecaptcha.reset();
+                }
+            });
+
+
+            $('#modal_family_detail').on('hide.bs.modal', function(e) {
+                $('#statusMsg').html('');
+                $('.familyfoot').addClass('hide');
+            });
+
+            $('#frmFamilyInfo').submit(function(e) {
+                e.preventDefault();
+                if ($('#frmFamilyInfo').valid()) {
+                    var targetUrl = '<?php echo SITEURL ?>ajax/ajss-family';
+                    $('#statusMsg').html('Processing...');
+                    var formDate = $(this).serialize();
+                    $.post(targetUrl, formDate, function(data, status) {
+                        if (status == 'success') {
+                            $('#statusMsg').html(data.msg);
+                            $('#modal_family_detail').modal('hide');
+                            if (data.code == 1) {
+                                displayAjaxMsg(data.msg, data.code);
+                            } else {
+                                displayAjaxMsg(data.msg, data.code);
+                            }
+                        } else {
+                            displayAjaxMsg(data.msg);
+                        }
+                    }, 'json');
+                }
+            });
+
+
+
+
+            //Communication Start
+            $(document).on('click', '.communication', function() {
+                var familyid = $(this).data('familyid');
+                var fathername = $(this).data('fathername');
+                var father_phone_no = $(this).data('fatherphone');
+                var email = $(this).data('primaryemail');
+                $('#father_phone_no').val(father_phone_no);
+                $('#primary_email').val(email);
+                $('#familyid').val(familyid);
+                $('#familyinfo_titlename').html(fathername + "'s Family");
+                $('#communicate_msg_email').modal('show');
+            });
+
+
+            $('#frmFamilyInfoCommunication').submit(function(e) {
+                e.preventDefault();
+                if ($('#frmFamilyInfoCommunication').valid()) {
+                    $('.btnsubmit').prop("disabled", true);
+                    $('#statusMsgcomm').html('Processing...');
+                    var targetUrl = "<?php echo SITEURL ?>ajax/ajss-family";
+                    var formDate = $(this).serialize();
+                    $.post(targetUrl, formDate, function(data, status) {
+                        if (status == 'success') {
+                            $('.btnsubmit').prop("disabled", false);
+                            if (data.code == 1) {
+                               $('#frmFamilyInfoCommunication').trigger('reset');
+                               $('#statusMsgcomm').html(data.msg);
+                               setInterval(function(){
+                                $('#statusMsgcomm').html('');
+                               }, 3000);
+                            } else {
+                                $('#statusMsgcomm').html(data.msg);
+                                setInterval(function(){
+                                    $('#statusMsgcomm').html('');
+                                }, 3000);
+                            }
+                        } else {
+                            displayAjaxMsg(data.msg, data.code);
+                        }
+
+                    }, 'json');
+
+                    //grecaptcha.reset();
+                }
+            });
+            //Communication End
+            
+        });
+
+
+
+        function fillTable() {
+            table = $('.datatable-basic').DataTable({
+                autoWidth: false,
+                destroy: true,
+                pageLength: <?php echo TABLE_LIST_SHOW ?>,
+                responsive: true,
+                ajax: '<?php echo SITEURL ?>ajax/ajss-family?action=list_family',
+                sProcessing: '',
+                language: {
+                    loadingRecords: "<img src='<?php echo SITEURL ?>assets/images/ajax-loader.gif'> <h5>Please wait...</h5>"
+                },
+                'columns': [{
+                        'data': 'id'
+                    },
+                    {
+                        'data': 'father_name',
+                        searchable: true,
+                        orderable: true,
+                    },
+                    {
+                        'data': 'mother_name',
+                        searchable: true,
+                        orderable: true
+                    },
+                    // {
+                    //     'data': 'city',
+                    //     searchable: true,
+                    //     orderable: true
+                    // },
+                    {
+                        'data': 'father_phone',
+                        searchable: true,
+                        orderable: true
+                    },
+                    {
+                        'data': 'primary_email',
+                        searchable: true,
+                        orderable: true
+                    },
+                    {
+                        'data': 'payment',
+                    },
+                ],
+                "order": [
+                    [1, "asc"]
+                ],
+                "columnDefs": [{
+                        "render": function(data, type, row) {
+
+                            var btn = '';
+                            <?php //if($_SESSION['icksumm_uat_login_usertypecode'] == 'UT01'){ 
+                           if(check_userrole_by_code('UT01')){ ?>
+
+
+                            <?php  if(in_array("su_family_info", $_SESSION['login_user_permissions'])){ ?>
+
+                            btn += "<a href='javascript:;' class='text-warning action_link viewdetail' data-fathername='" + row['father_name'] + "' data-familyid='" + row['id'] + "' title='View Details' >View</a>";
+
+                            //btn += "<a href='javascript:;' class='text-primary action_link communication' data-fathername='" + row['father_name'] + "' data-familyid='" + row['id'] + "' data-fatherphone='" + row['father_phone'] + "' data-primaryemail='" + row['primary_email'] + "' title='Communicate' >Communicate</a>";
+
+
+                            <?php if($client_setting->fees_monthly == 1){ ?>
+
+                            <?php  if(in_array("su_payment_credential_list", $_SESSION['login_user_permissions'])){ ?>
+                            btn += "<a href='payment_credential_list.php?id=" + row['id'] + "' class='text-success action_link' title='Credit Card'>Credit Card</a>";
+                            <?php } ?>
+
+                            <?php  if(in_array("su_payment_fees_history_list", $_SESSION['login_user_permissions'])){ ?>
+                            btn += "<a href='payment_fees_history_list.php?id=" + row['id'] + "' class='text-primary action_link' title='Schedule Payment'>Schedule Payment</a>";
+                            <?php } ?>
+
+                            <?php } ?>
+
+                            <?php } ?>
+                            <?php } ?>
+                            return btn;
+                        },
+                        "targets": 6
+                    },
+                    {
+                        "visible": false,
+                        "targets": [0]
+                    }
+                ]
+            });
+        }
+
+         function registerSummernote(element, placeholder, max, callbackMax) {
+            $(element).summernote({
+              toolbar: [
+                ['style', ['bold', 'italic', 'underline', 'clear']]
+              ],
+              placeholder,
+              callbacks: {
+                onKeydown: function(e) {
+                  var t = e.currentTarget.innerText;
+                  if (t.length >= max) {
+                    //delete key
+                    if (e.keyCode != 8)
+                      e.preventDefault();
+                    // add other keys ...
+                  }
+                },
+                onKeyup: function(e) {
+                  var t = e.currentTarget.innerText;
+                  if (typeof callbackMax == 'function') {
+                    callbackMax(max - t.length);
+                  }
+                },
+                onPaste: function(e) {
+                  var t = e.currentTarget.innerText;
+                  var bufferText = ((e.originalEvent || e).clipboardData || window.clipboardData).getData('Text');
+                  e.preventDefault();
+                  var all = t + bufferText;
+                  document.execCommand('insertText', false, all.trim().substring(0, 120));
+                  if (typeof callbackMax == 'function') {
+                    callbackMax(max - t.length);
+                  }
+                }
+              }
+            });
+          }
+
+
+        $(function(){
+          registerSummernote('.summernote', 'Message', 120, function(max) {
+            $('#maxContentPost').text(max)
+          });
+        });
+    </script>
+    <?php include "../footer.php"?>

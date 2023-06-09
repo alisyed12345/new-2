@@ -1,0 +1,543 @@
+﻿.mar-top-zero{
+	margin-top:0px;
+}
+.modal-header.bg-primary{
+	background-color: #1d80b1;
+    border-color: #1d80b1;
+}
+.help_thumb_img{
+	cursor:pointer;
+}
+#modal_help_screen img{
+	max-width:100%;
+}
+.navigation .navigation-header, .navigation .navigation-header a {
+    color: #fff;
+}
+.navigation .navigation-header{
+	border-bottom: solid 1px #afafaf;
+}
+#modal_switch_account .modal-dialog{
+	width:300px;
+}
+marquee.announcement{
+	background: #146289;
+	color: #fff;
+	font-size: 20px;
+}
+marquee.announcement span{
+	margin-right:50px;
+}
+marquee.announcement span i{
+	margin-right:5px;
+}
+.page-header-default {
+    margin-bottom: 10px;
+}
+.text-yellow, .text-yellow:focus, .text-yellow:hover{
+	color: #ffc00f;
+}
+.form-validate-jquery-2 label.error{
+	margin-top: 7px;
+    margin-bottom: 7px;
+    color: #f44336;
+    position: relative;
+	padding-left: 5px;
+    z-index: 0;
+    display: inline-block;
+}
+.cursor_default{
+	cursor: pointer;
+}
+.msg_signature{
+	font-size: 12px;
+	color: #848484;
+	font-style: italic;
+}
+.cal_timeperiod{
+	color: #d85865;
+}
+.mob_title{
+	display:none;
+	float: left;
+	padding: 5px 10px;
+	font-size: 1.5em;
+	line-height: 30px;
+	height: 46px;
+	width:70%;	
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.sel_atten_day{
+	background:#C6FF71;
+} 
+.modal-dialog {
+    width: 800px; 
+}
+.sidebar-main{
+	height:100vh;
+}
+.panel-body img{
+	max-width:100%;
+}
+.panel-default.yearly_calendar .panel-heading {
+	padding: 2px 10px;
+}
+.panel-default.yearly_calendar .h4.panel-title, .panel-default.yearly_calendar h4.panel-title {
+    font-size: 14px;
+}
+.panel-default.yearly_calendar #timetable{
+	margin-bottom: 0px;
+}
+#attendance_sheet.table > tbody > tr > td, #attendance_sheet.table > thead > tr > th{
+	/* padding:5px 10px; */
+	padding:5px 5px;
+	text-align: center;
+}
+.panel-default.yearly_calendar .callink{
+	display: block;
+}
+.panel-default.yearly_calendar .panel-title>a{
+	color: #3990cf;
+	letter-spacing: 2px;
+}
+.att_day{
+	padding: 20px;
+	text-align: center;
+	font-size: 16px;
+	margin-bottom: 15px;
+	border-radius: 3px;
+	cursor:pointer;
+}
+.att_day small{
+	font-size: 80%;
+}
+.att_pres{
+	background: #95d55d;
+	color: #666;
+}
+.att_late{
+	background: #ffec61;
+	color: #666;
+}
+.att_abse{
+	background: #ffb1b1;
+	color: #666;
+}
+.atte_group_name{
+	margin-bottom:10px;
+}
+.navbar-inverse {
+    background-color: #146289;
+}
+.btn{
+	text-transform:uppercase !important;
+}
+.btn-success{
+	/* background-color: #72c02c !important;
+	border-color: #72c02c !important; */
+	background-color: #3990cf !important;
+	border-color: #3990cf !important;
+}
+a.action_link{
+	margin: 0 5px;
+	border: dashed 1px #bcbcbc;
+	padding: 3px;
+}
+a.action_link:hover{
+	border: dashed 1px #bcbcbc;
+}
+.validation-valid-label{
+	display:none !important;
+}
+.marR10{
+	margin-right:10px;
+}
+.spinner{
+	color:#F30;
+	font-size:24px;
+}
+.spinner.spinner-orig{
+	font-size:inherit !important;
+}
+.spinner.insidebtn{
+	color: #FFEA00;
+	font-size: 17px;
+}
+.school_mgt_label{
+	display: inline;
+	font-size: 26px; 
+	margin-left:4%;
+}
+.label.ajaxMsgBot{
+	font-size:13px;
+	text-transform:none;
+	font-weight: normal;
+}
+.message_tree{
+	width:100%;
+	overflow-y:auto;
+	height:300px;	
+	border: solid 1px #cfcfcf;
+	padding: 15px;
+}
+.form-control[readonly].pickatime{
+	background:#fff;
+}
+.attendance_cont{
+	width:100%;
+	overflow-x:auto;
+	height:auto;	
+	/*margin-bottom:25px;*/
+}
+.page-title {
+    padding: 10px 0px 10px 0;
+}
+.login_content{
+    margin:2% auto;
+    width: 40%;
+}
+.navbar-header {
+    min-width: 500px;
+}
+.navbar-brand {
+    padding: 5px 10px;
+}
+.navbar-brand > img {
+    height: 32px;
+	/*border: solid 1px #fff;*/
+}
+.form-horizontal .form-group {
+    margin-left: 0;
+    margin-right: 0;
+}
+.dataGrid.table > tbody > tr > td, .dataGrid.table > thead > tr > th{
+    padding: 5px;
+}
+.dataGrid.table .checkbox label {
+    padding-left: 20px;
+}
+.guest_screen {
+    background-size: auto auto;
+    background-size: cover;
+}
+.login-form {
+    background: rgba(255,255,255,0.95);
+}
+.table{
+margin-bottom: 20px;  
+}
+.dataTables_wrapper .table-bordered{
+border: 1px solid #ddd;
+}
+.dataTables_filter{
+margin-left: 0px;
+}
+.dataTables_filter input{
+margin-left: 10px;
+}
+.page-title h4{
+display:inline-block;
+}
+.daterangepicker.show-calendar{
+    z-index: 99999;
+}
+.mandatory{
+	color:#c00;
+	margin-left:5px;
+}
+.viewonly label{
+	color:#d85865;
+	margin-right:10px;
+}
+.page-content .content_box {
+    padding: 0 20px 20px 20px;
+}
+.panel-body-box, .panel-flat-box{
+	min-height:100vh;
+}
+.content-box{
+	padding: 0 20px 20px 20px;
+}
+ul.breadcrumb li a{
+	color: #3990cf;
+}
+.above-content{
+	position: relative;
+	padding: 5px 20px;
+	overflow:auto;
+	border-top: 1px solid #ddd;
+}
+.above-content a.last_page{
+	float:right;
+}
+.breadcrumb-line .breadcrumb {
+    margin-right: 0px;
+	padding: 6px 0 5px 0;
+}
+#overlay {
+    /*position: fixed;*/
+	position: absolute;
+    display: none;
+    width: 100%;
+    height: 100vh;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    /*background-color: rgba(114,192,44,0.6);*/
+	background-color: rgba(0,0,0,0.6);
+    z-index: 2;
+    cursor: pointer;
+	text-align:center;
+}
+#overlay_text{
+    position: absolute;
+    top: 150px;
+    left: 50%;
+    font-size: 26px;
+    color: #FF0;
+	/*text-shadow:2px 2px 2px #666;*/
+    transform: translate(-50%,-50%);
+    -ms-transform: translate(-50%,-50%);
+}
+#overlay_text .spinner {
+    color: #F9FF00;
+    font-size: 48px;
+}
+.dataGrid.table > thead > tr > th.action_col{
+	padding:0;
+}
+table.dataTable.dtr-inline.collapsed > tbody > tr > td.child{
+	word-wrap: break-word;
+	word-break: break-all;
+	white-space: normal;
+}
+table.message_list span.rec_name{
+	float:left;
+	width:48%;
+}
+table.message_list span.msg_datetime{
+	float:right;
+	width:48%;
+	text-align:right;
+}
+table.message_list thead {
+  display:none;
+}
+.table .other_msg{
+	max-width: 85%;
+	float: left;
+	text-align: left;
+	display: inline;
+	background: #dedddd;
+	padding: 3px 15px;
+	border-radius: 10px;
+}
+.table .my_msg{
+	max-width: 85%;
+	float: right;
+	text-align: right;
+	display: inline;
+	background: #d0f6b1;
+	padding: 3px 15px;
+	border-radius: 10px;
+}
+.overflow_eclipse{
+	/*white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;*/
+}
+.navigation.navigation-main li hr{
+	margin:0;
+}
+/*DATA TABLES TOP BUTTON*/
+div.dt-buttons {
+	float: right;
+}
+.validation-error-label::before, .validation-valid-label::before{
+	display:none;
+}
+.validation-error-label, .validation-valid-label{
+	padding-left:5px;
+	z-index:0;
+	display:inline-block;
+}
+.bootstrap-select.btn-group .dropdown-menu > .selected > a {
+    background-color: #3990cf;
+}
+.nav-tabs.nav-tabs-solid > .active > a, .nav-tabs.nav-tabs-solid > .active > a:focus, .nav-tabs.nav-tabs-solid > .active > a:hover {
+    background-color: #ff7043;
+    border-color: #ff7043;
+}
+.teacher_timetable .nav-tabs.nav-tabs-solid > .active > a{
+	font-weight:500;
+}
+
+.ftdiv{
+    position: fixed;
+    width: 100%;
+    bottom: 0;
+    display: block;
+}
+
+.ftcontent{
+	background-color:#263238;
+	color:#ececec;
+}
+
+.copyright-area {
+    padding: 5px 0;
+	z-index: 999;
+}
+
+.copyright-text p a {
+    color:#31c3e7;
+}
+
+.content-wrapper {
+    display: block;
+    vertical-align: top;
+    padding-bottom: 50px;
+}
+
+.has-feedback-left .form-control.loginfield {
+	padding-right: 12px;
+	padding-left: 10px;
+}
+
+/***SweetAlert2***/
+
+.swal2-title {
+	font-size: 3em !important;
+}
+
+/***SweetAlert2***/
+
+.swal2-content {
+	font-size: 2em !important;
+}
+
+/***SweetAlert2***/
+
+.swal2-popup {
+	width: 50em !important;
+}
+
+table.schedule_table .highlight-text{
+	color: #e60000;
+	font-weight: bold;
+}
+
+
+.visa {
+	background: url(https://icksaturdayqa.click2clock.com/assets/images/visa-card-icon.png) no-repeat right 5px center;
+}
+
+.mastercard {
+	background: url(https://icksaturdayqa.click2clock.com/assets/images/master-card-icon.png) no-repeat right 5px center;
+}
+
+.discover {
+	background: url(https://icksaturdayqa.click2clock.com/images/discover-card-icon.png) no-repeat right 5px center;
+}
+
+.amex {
+	background: url(https://icksaturdayqa.click2clock.com/assets/images/am-exp-card-icon.png) no-repeat right 5px center;
+}
+
+.diners {
+	background: url(https://icksaturdayqa.click2clock.com/assets/images/diners-club-icon.png) no-repeat right 5px center;
+}
+
+.jcb {
+	background: url(https://icksaturdayqa.click2clock.com/assets/images/jcb-icon.png) no-repeat right 5px center;
+}
+
+@media only screen and (max-width:768px) and (orientation: portrait) {
+    .action_col{
+		display:none;
+	}
+}
+@media (max-width:768px) {
+	.breadcrumb-line{
+		z-index:1;
+	}
+	.dataTables_filter{
+		text-align:left;
+	}
+	.content {
+		padding: 0 10px 0px 10px;
+	}
+	.panel-body {
+		padding: 10px;
+	}
+	.modal-dialog { 
+		width: auto;
+	}
+	#modal_switch_account .modal-dialog{
+		width: auto;
+	}
+	.sidebar-main{
+		height:auto;
+	}
+    .visible-xs {
+        display: block!important
+    }
+    table.visible-xs {
+        display: table!important
+    }
+    tr.visible-xs {
+        display: table-row!important
+    }
+    td.visible-xs,
+    th.visible-xs {
+        display: table-cell!important
+    }
+	.login_content {
+	    width: 100%;
+	}
+	.navbar-header {
+		min-width: 100%;
+	}
+	.guest_screen{
+		background-size: inherit;
+	}
+}
+@media (min-width:769px) and (max-width:1024px) {
+	.login_content {
+	    width: 70%;
+	}
+	.navbar-header {
+		min-width: auto;
+	}
+	
+.content-wrapper {
+    display: block;
+    vertical-align: top;
+    padding-bottom: 50px;
+}
+}
+@media only screen and (min-width:768px) and (max-width:1024px) and (orientation: landscape) {
+	.lg_logo{
+		display:none !important;
+	}
+	.xs_logo{
+		display:block !important;
+	}
+}
+@media (min-width:1025px) and (max-width:1199px) {
+}
+@media (min-width:1025px) and (max-width:1199px) {
+}
+@media (min-width:1200px) {
+}
+@media (max-width:768px) {
+}
+@media (min-width:769px) and (max-width:1024px) {
+}
+@media (min-width:1025px) and (max-width:1199px) {
+}
+@media (min-width:1200px) {
+}

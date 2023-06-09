@@ -1,0 +1,96 @@
+<?php
+//LIVE - QA SITE
+//set_include_path('/home3/bayyanor/public_html/ick/academy_new/includes/');
+
+//DEV
+//set_include_path('/webroot/b/a/bayyan005/icksaturdayqa.click2clock.com/www/includes/');
+
+//include_once "config.php";   
+include_once "../includes/config.php";
+include_once '../includes/dompdf/autoload.inc.php';
+if (ENVIRONMENT == 'dev') {
+    $reminderdate = "sfi.schedule_payment_date";
+} else {
+    $reminderdate = "DATE_SUB(sfi.schedule_payment_date, INTERVAL '" . $SCHEDULE_PAYMENT_EMAIL_REMINDER . "' DAY)   ";
+}
+
+use Dompdf\Dompdf;
+
+$SCHEDULE_PAYMENT_EMAIL_REMINDER = SCHEDULE_PAYMENT_EMAIL_REMINDER;
+//before Remainder1
+$Query = "SELECT sfi.id AS sch_item_id, u.is_active, sfi.original_schedule_payment_date, sfi.schedule_payment_date, sum(sfi.amount) AS final_amount, sfi.schedule_status, s.family_id, s.user_id, s.first_name, s.last_name, f.father_first_name, f.father_last_name, f.father_phone, f.primary_email, f.billing_address_1, f.billing_address_2, pay.credit_card_no FROM 
+ss_student_fees_items sfi
+INNER JOIN ss_student s ON sfi.student_user_id = s.user_id
+INNER JOIN ss_user u ON u.id = s.user_id
+INNER JOIN ss_student_session_map ssm ON ssm.student_user_id = u.id
+INNER JOIN ss_family f ON f.id = s.family_id
+INNER JOIN ss_paymentcredentials pay ON pay.family_id = s.family_id
+WHERE sfi.session='" . $_SESSION['icksatac_CURRENT_SESSION'] . "' AND u.is_deleted = 0 AND pay.default_credit_card =1 AND sfi.schedule_notification = 0 AND CURDATE() = " . $reminderdate . "
+group by sfi.id ORDER BY  sfi.original_schedule_payment_date ASC";
+$remainder = $db->get_results($Query);
+
+$final_amount = 0;
+$student_name='';
+foreach ($remainder as $remind) {
+    $final_amount += $remind->final_amount;
+    $student_name.=$remind->first_name.' '.$remind->last_name. ",";
+}
+
+/* echo  $final_amount."xx<pre>";
+print_r($remainder); */
+if (count($remainder) > 0) {
+
+    $invoce_id = mt_rand();
+    include_once "../payment/invoice_pdf.php";
+    define("DOMPDF_UNICODE_ENABLED", true);
+    $dompdf = new Dompdf();
+    $dompdf->loadHtml($html);
+
+    // (Optional) Setup the paper size and orientation 
+    $dompdf->setPaper('Executive', 'Potrate');
+
+    // Render the HTML as PDF 
+    $dompdf->render();
+    $path = '../payment/invoice_and_pdf';
+    $filename = "/" . $invoce_id;
+    $output = $dompdf->output();
+    $fullpath = $invoce_id . 'invoice.pdf';
+    file_put_contents($path . $filename . 'invoice.pdf', $output);
+    unset($dompdf);
+
+ 
+   foreach ($remainder as $remind) {
+        //--------------Invoice Update(IF Exist) OR Insert-----------//
+        $Student_invoice_Id = $db->get_var("SELECT id FROM `ss_invoice` where student_item_id = '" . $remind->sch_item_id . "' limit 1 ");
+        if ($Student_invoice_Id > 0) {
+            $db->query("update ss_invoice set invoice_id = '" . $invoce_id . "', invoice_date = '" . date('Y-m-d') . "', is_due = '1', invoice_file_path = '" . $fullpath . "' where student_item_id = '" . $remind->sch_item_id . "' ");
+        } else {
+            $db->query("insert into ss_invoice set user_id='" . $remind->user_id . "', student_item_id='" . $remind->sch_item_id . "', invoice_id='" . $invoce_id . "', invoice_date='" . date('Y-m-d') . "', amount='" . $final_amount . "', is_due='0', status = '1', created_at='" . date('Y-m-d H:i:s') . "', invoice_file_path='" . $fullpath . "', created_by='" . $_SESSION['icksatac_login_userid'] . "'");
+        }
+        $star = '************';
+        $credit_card_no = $star . substr(str_replace(' ', '', base64_decode($remind->credit_card_no)), -4);
+        $emailbody_support = "Assalamualaikum, <strong> " . $remind->father_first_name . " " . $remind->father_last_name . "</strong><br>";
+        $emailbody_support .= "I hope you're doing well! This is a friendly reminder that $" . $final_amount . ", 
+        is due for payment on " . date('F d', strtotime($remind->schedule_payment_date)) . " We will process your 
+        credit card ending with " . $credit_card_no . " to capture this pyment.";
+        $emailbody_support .= "<br><br>" . CENTER_SHORTNAME . ' ' . SCHOOL_NAME;
+        $emailbody_support .= "<br><br>For any comments or question, please send email to " . SUPPORT_EMAIL . "";
+        $subject = "Payment Reminder: Due " . date('F d Y', strtotime($remind->schedule_payment_date));
+        
+     $emailbody_support; 
+        $mail_service_array = array(
+            'subject' => $subject,
+            'message' => $emailbody_support,
+            'request_from' => MAIL_SERVICE_KEY,
+            'attachment_file_name' => [$filename . 'invoice.pdf'],
+            'attachment_file' => [$path . '/' . $fullpath],
+            'to_email' => [$remind->primary_email],
+            'cc_email' => [],
+            'bcc_email' => ''
+        );
+
+      mailservice($mail_service_array);
+        $remainder1 =  $db->query("update ss_student_fees_items set schedule_notification = 1 where id='" . $remind->sch_item_id . "'");
+        echo "sucesss";
+    } 
+}

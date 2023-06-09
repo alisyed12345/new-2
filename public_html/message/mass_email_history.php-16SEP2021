@@ -1,0 +1,153 @@
+<?php 
+$mob_title = "Message";
+include "../header.php"
+?>
+<!-- Page header -->
+<div class="page-header page-header-default">
+  <div class="page-header-content">
+    <div class="page-title">
+      <h4 style="display:inline-block">Mass Email History</h4>
+    </div>
+  </div>
+  <div class="breadcrumb-line">
+    <ul class="breadcrumb">
+      <li><a href="<?php echo SITEURL."dashboard" ?>"><i class="icon-home2 position-left"></i> Dashboard</a></li>
+      <li class="active">Mass Email History</li>
+    </ul>
+  </div>
+  <div class="above-content"> <a href="<?php echo SITEURL ?>message/mass_email" class="pull-right"><span class="label label-danger">Send Mass Email</span></a> </div>
+</div>
+<!-- /page header --> 
+<!-- Content area -->
+<div class="content content-box">
+<div class="row">
+<div class="col-lg-12">
+  <div class="panel panel-flat panel-flat-box">
+    <div class="panel-body panel-body-box">
+      <div class="row">
+        <div class="col-lg-12">
+        <div class="table-responsive">
+          <table class="table table-bordered dataGrid">
+            <thead>
+              <tr>
+                <th>Bulk Message ID</th>
+                <th>Bulk Message ID Encrypted</th>
+                <th>Date</th>
+                <th>Subject</th>
+                <th>Sent</th>
+                <th>In Queue</th>
+                <th>Failed</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+            </tbody>
+          </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>	
+</div>
+<!-- Modal - Mail Detail-->
+<div id="modal_mail_detail" class="modal fade">
+<div class="modal-dialog">
+  <div class="modal-content">
+    <div class="modal-header">
+      <button type="button" class="close" data-dismiss="modal">&times;</button>
+      <h5 class="modal-title">Mail Detail</h5>
+    </div>
+    <div class="modal-body viewonly" id="mail_detail"></div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-link" data-dismiss="modal">Close</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- /Modal -->
+</div>
+</div>
+<script>
+$( document ).ready(function() {
+	//FILL TABLE 
+	fillTable();
+	
+	//FETCH MAIL DETAILS
+	$(document).on('click','.viewdetail',function(){ 
+		var msgid = $(this).data('msgid');
+		var targetUrl = '<?php echo SITEURL ?>ajax/ajss-message';
+
+		$('#mail_detail').html('<h5>Data loading, please wait...</h5>');
+		$('#modal_mail_detail').modal('show');
+				
+		$.post(targetUrl,{msgid:msgid,action:'view_mail_detail'},function(data,status){
+			if(status == 'success'){
+				$('#mail_detail').html(data);
+			}
+		});
+	});
+
+	//FETCH STAFF DETAILS
+	$(document).on('click','.resend',function(){ 
+		if(confirm('Are you sure you want to re-queue failed deliveries?')){
+			var msgid = $(this).data('msgid');
+			var targetUrl = '<?php echo SITEURL ?>ajax/ajss-message';
+	
+			$(this).parent().append(' Wait...');				
+			$.post(targetUrl,{msgid:msgid,action:'resend_mass_emails'},function(data,status){
+				if(status == 'success'){
+					fillTable();
+				}
+			});
+		}
+	});
+});
+
+function fillTable(){ 
+	var table = $('.dataGrid').DataTable({
+        autoWidth: false,
+		destroy: true,
+		pageLength: <?php echo TABLE_LIST_SHOW ?>,
+		sProcessing:'',		
+		language: {
+		   loadingRecords: "<img src='<?php echo SITEURL ?>assets/images/ajax-loader.gif'> <h5>Please wait...</h5>"
+		},
+		responsive: true,
+		ajax: '<?php echo SITEURL ?>ajax/ajss-message?action=mass_email_history',
+		'columns': [
+		{ 'data': 'id' },
+		{ 'data': 'msgid' },
+		{ 'data': 'created_on',searchable: true,orderable: true},
+		{ 'data': 'subject',searchable: true,orderable: true},
+		{ 'data': 'sent',orderable: true},
+		{ 'data': 'in_queue',orderable: true},
+		{ 'data': 'failed',orderable: true},
+		
+		],
+		"order": [[ 0, "desc" ]],
+		"columnDefs": [
+		{
+			"render": function ( data, type, row ) { 
+				var links = '';
+
+				if(row['failed'] > 0){
+					//return "<a href='javascript:void(0)' data-msgid='" + row["msgid"] + "' class='text-primary action_link resend' title='Re-send Failed Mails'><i class = 'icon-mail5' ></i></a>";
+				<?php  if(in_array("su_communicate_send_mass_email", $_SESSION['login_user_permissions'])){ ?>
+					links = "<a href='javascript:void(0)' data-msgid='" + row["msgid"] + "' class='text-primary action_link resend' title='Re-send Failed Mails'>Re-send Failed Mails</a>";
+				<?php } ?>
+				}else{
+					links = '';
+				}
+              <?php  if(in_array("su_communicate_view", $_SESSION['login_user_permissions'])){ ?>
+				links = links + "<a href='javascript:void(0)' data-msgid='" + row["msgid"] + "' class='text-danger action_link viewdetail' title='View Email Details'>View Email Details</a>";
+				<?php } ?>
+
+				return links;
+			}, "targets": 7 },
+			{ "visible": false,  "targets": [ 0,1 ] }
+        ]
+    });
+}
+</script>
+<?php include "../footer.php"?>

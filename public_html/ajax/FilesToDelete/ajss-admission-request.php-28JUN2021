@@ -1,0 +1,806 @@
+<?php 
+include_once "../includes/config.php";  
+  
+//AUTHARISATION CHECK
+if(!isset($_SESSION['icksumm_uat_login_userid'])){
+	return;
+} 
+ 
+//==========================GET NOTIFICATION DETAILS=====================
+if($_GET['action'] == 'get_header_notif'){
+	$admission_reqs_all = $db->get_results("SELECT * FROM ss_sunday_school_reg WHERE id IN (SELECT sunday_school_reg_id FROM ss_sunday_sch_req_child WHERE is_executed = 0) order by id desc");
+	
+	foreach($admission_reqs_all as $req){
+		$notification_summary .= '
+		<li class="media">
+			<div class="media-body">
+				<a href="'.SITEURL.'admission_request/admission_request_pending.php?reqid='.$req->id.'" class="media-heading">
+					<span class="text-semibold">Admission Request #'.$req->id.'</span>
+					<span class="media-annotation pull-right">'.date('m/d/Y h:i A',$req->created_on).'</span>
+				</a>
+				<span class="text-muted">New admission request received</span>
+			</div>
+		</li>';
+	}
+	
+	echo json_encode(array('notif_count' => count($admission_reqs_all), 'notif_summary' => $notification_summary));
+	exit;
+}
+
+//==========================REMOVE REQUEST=====================
+elseif($_POST['action'] == 'remove_request'){
+	$childno = $_POST['childno'];
+	$reqno = $_POST['reqno'];
+	
+	$db->query('BEGIN');
+	
+	$resp_1 = $db->query("delete from ss_sunday_sch_req_child where id = '".$childno."'");
+	$checkReq = $db->get_results("select * from ss_sunday_sch_req_child where sunday_school_reg_id = '".$reqno."'");
+	
+	if(count($checkReq) == 0){
+		$resp_2 = $db->query("delete from ss_sunday_school_reg where id = '".$reqno."'");
+	}else{
+		$resp_2 = 1;
+	}	
+	
+	if($resp_1 > 0 && $resp_2 > 0 && $db->query('COMMIT') !== false){
+		echo json_encode(array('code' => "1",'msg' => 'Admission request deleted successfully'));
+		exit;	
+	}else{
+		$db->query('ROLLBACK');
+		echo json_encode(array('code' => "0",'msg' => 'Admission request not deleted'));
+		exit;
+	}
+}
+
+//==========================LIST ALL PENDING ADMISSION REQUESTS=====================
+elseif($_GET['action'] == 'list_adm_req_pending'){
+	//if($_SESSION['icksumm_uat_login_usertypecode'] == 'UT01'){
+	if(check_userrole_by_code('UT01')){	
+		$finalAry = array();
+		$admRequests = array();  
+		
+		if(is_numeric($_GET['reqid'])){
+			$admission_reqs = $db->get_results("SELECT * from ss_sunday_school_reg where id = '".$_GET['reqid']."'");
+		}else{
+			$admission_reqs = $db->get_results("SELECT * from ss_sunday_school_reg where session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' order by id desc");
+		}
+
+		foreach($admission_reqs as $adm_requests){
+			$children = $db->get_results("SELECT * from ss_sunday_sch_req_child where sunday_school_reg_id = '".$adm_requests->id."'");
+			
+			//$child_counter = 0;
+			foreach($children as $child){
+				if(trim($child->first_name) != '' && $child->is_executed == 0){
+					//$child_counter++;
+					$temp = array();
+					
+					$interview_date = '';
+					if(trim($child->interview_date)!=''){
+						$interview_date = date('d F,Y',strtotime($child->interview_date));
+					}
+					
+					if($child->added_to_waitlist == 1){
+						$child->school_grade = $child->school_grade.' - Waitlist';
+					}
+					
+					$temp['req_no'] = $adm_requests->id;
+					$temp['student_name'] = $child->first_name.' '.$child->last_name;
+					$temp['gender'] = $child->gender == 'm'?'Male':'Female';
+					$temp['father_name'] = $adm_requests->father_first_name.' '.$adm_requests->father_last_name;
+					$temp['mother_name'] = $adm_requests->mother_first_name.' '.$adm_requests->mother_last_name;
+					$temp['school_grade'] = $child->school_grade;
+					$temp['interview'] = $interview_date;
+					$temp['class_session'] = str_replace("-","  to ",$adm_requests->class_session);
+					$temp['child_no'] = $child->id;	//$child_counter;	
+					$temp['dob'] = date('m/d/Y',strtotime($child->dob));
+					$temp['created_on'] = date('m/d/Y h:i a',strtotime($adm_requests->created_on));				
+					$temp['student_link'] = "<a href='javascript:void(0)' title='View Full Detail' data-childno='".$child->id."' data-version='v2' data-reqno='".$adm_requests->id."' class='text-primary viewdetail'>".$child->first_name.' '.$child->last_name."</a>";
+					
+					$admRequests[] = $temp;
+				}
+			}		
+		}
+		
+		$finalAry['data'] = $admRequests;
+		echo json_encode($finalAry);
+		exit;
+	}
+}
+
+//==========================LIST ALL COMPLETED ADMISSION REQUESTS=====================
+elseif($_GET['action'] == 'list_adm_req_completed'){
+	//if($_SESSION['icksumm_uat_login_usertypecode'] == 'UT01'){
+	if(check_userrole_by_code('UT01')){	
+		$finalAry = array();
+		$admRequests = array();
+		
+		$deletedStuAry = array();
+		$del_students = $db->get_results("select id from ss_user where session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' and is_deleted=1");	
+		foreach($del_students as $delStu){
+			$deletedStuAry[] = $delStu->id;
+		}
+
+		$admission_reqs = $db->get_results("SELECT * from ss_sunday_school_reg where session = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."' order by id desc");
+
+		foreach($admission_reqs as $adm_requests){
+			$children = $db->get_results("SELECT * from ss_sunday_sch_req_child where sunday_school_reg_id = '".$adm_requests->id."'");
+			
+			foreach($children as $child){
+				if(trim($child->first_name) != '' && $child->user_id > 0 && !in_array($child->user_id,$deletedStuAry)){
+					$temp = array();
+				
+					$child_user_id = $child->user_id;
+					$child_admission_date = $db->get_var("select admission_date from ss_student where user_id='".$child_user_id."'");
+					$child_admission_date = date('d F, Y', strtotime($child_admission_date));
+					
+					$child_group = $db->get_var("select group_name from ss_groups where id = (select group_id from ss_studentgroupmap 
+					where student_user_id='".$child_user_id."' order by id desc limit 1)");
+					
+					$temp['req_no'] = $adm_requests->id;
+					$temp['student_name'] = $child->first_name.' '.$child->last_name;
+					$temp['gender'] = $child->gender == 'm'?'Male':'Female';
+					$temp['father_name'] = $adm_requests->father_first_name.' '.$adm_requests->father_last_name;
+					$temp['mother_name'] = $adm_requests->mother_first_name.' '.$adm_requests->mother_last_name;
+					$temp['school_grade'] = $child->school_grade;
+					$temp['admission_date'] = $child_admission_date;
+					$temp['alloted_group'] = $child_group;
+					$temp['child_no'] = $child->id;	
+					$temp['student_link'] = "<a href='javascript:void(0)' title='View Full Detail' data-childno='".$child->id."'  data-reqno='".$adm_requests->id."' class='text-primary viewdetail'>".$child->first_name.' '.$child->last_name."</a>";	
+					
+					$admRequests[] = $temp;
+				}
+			}
+		}
+		
+		$finalAry['data'] = $admRequests;
+		echo json_encode($finalAry);
+		exit;
+	}
+}
+
+// //==========================ASSIGN GROUP TO NEW STUDENT===================
+elseif($_POST['action'] == 'assign_group_to_new_student'){
+	$get_general_info = $db->get_var("select one_student_one_lavel from ss_client_settings where status = 1");
+	//Single Group
+	if ($get_general_info == 1) {
+		$group_id = $_POST['group_id'];
+		$reqno = $_POST['reqno'];
+		$childno = $_POST['childno'];
+		
+		$group_details = $db->get_row("select * from ss_groups where id = '".$group_id."'");
+		$groupMaxLimit = $group_details->max_limit;
+		$group_name = $group_details->group_name;
+		
+		//$groupCurStrength = $db->get_var("select count(1) from ss_studentgroupmap where group_id = '".$group_id."' and latest = 1");
+		$groupCurStrength = $db->get_var("SELECT COUNT(1) FROM ss_studentgroupmap m INNER JOIN ss_user u ON m.student_user_id = u.id WHERE u.`is_active` = 1 
+		AND u.`is_deleted` = 0 AND group_id = '".$group_id."' AND latest = 1 AND u.`session` = '".$_SESSION['icksumm_uat_CURRENT_SESSION']."'");
+		
+		if($groupCurStrength < $groupMaxLimit){
+			$child_user_id = 0;
+			
+			$child_user_id = $db->get_var("select user_id from ss_sunday_sch_req_child where id='".$childno."'");
+			
+			if(trim($child_user_id) == ''){
+
+				$adm_info = $db->get_row("select * from ss_sunday_school_reg where id='".$reqno."'");
+				
+				$child_info = $db->get_row("select * from ss_sunday_sch_req_child where id='".$childno."'");
+				$newUsername = generateUsername($child_info->first_name,$child_info->last_name,$child_info->dob);
+				$first_name = trim($db->escape($child_info->first_name));
+				$last_name = trim($db->escape($child_info->last_name));
+				$dob = trim($db->escape($child_info->dob));
+				$gender = trim($db->escape($child_info->gender));
+				$allergies = trim($db->escape($child_info->allergies));
+				$school_grade = trim($db->escape($child_info->school_grade));
+				$qur_sch_stu_user_id = $child_info->qur_sch_stu_user_id;
+
+				if(trim($qur_sch_stu_user_id) == ''){
+					$qur_sch_stu_user_id = "NULL";
+				}
+
+				$newPassword = generatePassword();
+				
+				//GET USER TYPE ID FOR STUDENT (UT03 FOR  STUDENT)
+				$userTypeId = $db->get_var("select id from ss_usertype where user_type_code='UT03'");
+				
+				if($newUsername != ''){
+
+					$db->query('BEGIN');
+					//ENTRY INTO USER TABLE
+					$db->query("insert into ss_user set username='".$newUsername."', password='".md5($newPassword)."', email='".trim($db->escape($adm_info->primary_email))."', user_type_id='".$userTypeId."', is_email_verified=0, is_locked=0, is_active=1, session='".$_SESSION['icksumm_uat_CURRENT_SESSION']."', created_on='".date('Y-m-d H:i:s')."'");		
+					$user_id = $db->insert_id;
+
+					if($user_id > 0){
+
+						//GET USER TYPE ID FOR STUDENT (UT03 FOR  STUDENT)
+						$studentUserTypeId = $db->get_var("select id from ss_usertype where user_type_code='UT03'");
+						
+						//ADDED ON 19-AUG-2018 - INSERT/ASSIGN 'STUDENT' ROLE TO STUDENT USER 
+						$stu_usertype_added = $db->query("insert into ss_usertypeusermap set user_id='".$user_id."', 
+						user_type_id = '".$studentUserTypeId."', created_by_user_id = '".$_SESSION['icksumm_uat_login_userid']."', 
+						created_on = '".date('Y-m-d H:i')."'");
+						
+						//ENTRY IN STUDENT TABLE
+						$student_res = $db->query("insert into ss_student set user_id='".$user_id."', admission_date='".date('Y-m-d')."', first_name='".$first_name."', last_name='".$last_name."', dob='".$dob."', gender='".$gender."',  allergies='".$allergies."', school_grade='".$school_grade."', qur_sch_stu_user_id = ".$qur_sch_stu_user_id.",
+							created_by_user_id='".$_SESSION['icksumm_uat_login_userid']."', created_on='".date('Y-m-d H:i:s')."'");
+						
+						if($stu_usertype_added && $student_res){
+
+							//CHECK IF FAMILY EXISTS
+							$familyInfo = $db->get_row("select * from ss_family where primary_email='".$db->escape(trim($adm_info->primary_email))."'");
+							
+							if(count($familyInfo)){ 
+								$parents_user_id = $familyInfo->user_id;
+								$family_id = $familyInfo->id;
+								$is_family_exists_in_db = true;
+							}else{ 
+								$is_family_exists_in_db = false;
+								
+								//GET USER TYPE ID FOR PARENTS (UT05 FOR  PARENTS)
+								$parentsUserTypeId = $db->get_var("select id from ss_usertype where user_type_code='UT05'");
+				
+								$parentsPassword = generatePassword();
+								
+								//ADDED ON 16-AUG-2018 - CHECK IF ACCOUNT EXITS WITH ENTERED EMAIL
+								$emailCheck = $db->get_row("select * from ss_user where username='".trim($adm_info->primary_email)."'");
+								
+								if($emailCheck){
+									//ADDED ON 16-AUG-2018
+									$parents_user_id = $emailCheck->id;
+								}else{
+									//COMMENTED ON 16-AUG-2018
+									//$db->query("insert into ss_user set username='".$db->escape(trim($adm_info->primary_email))."', password='".md5($parentsPassword)."', email='".trim($db->escape($adm_info->primary_email))."', user_type_id='".$parentsUserTypeId."', is_email_verified=1, is_locked=0, is_active=1, created_on='".date('Y-m-d H:i:s')."'");
+								
+									//ADDED ON 16-AUG-2018
+									$db->query("insert into ss_user set username='".$db->escape(trim($adm_info->primary_email))."', password='".md5($parentsPassword)."', email='".trim($db->escape($adm_info->primary_email))."', is_email_verified=1, is_locked=0, is_active=1, created_on='".date('Y-m-d H:i:s')."'");
+									$parents_user_id = $db->insert_id;
+								}
+					
+								if($parents_user_id > 0){ 
+
+								    //ENTRY IN FAMILY TABLE
+									$sql = "insert into ss_family set login_pin='".rand(1000,9999)."',
+									user_id='".$parents_user_id."', 
+									father_first_name='".trim($db->escape($adm_info->father_first_name))."',
+									father_last_name='".trim($db->escape($adm_info->father_last_name))."',
+									father_area_code='".trim($db->escape($adm_info->father_area_code))."',
+									father_phone='".trim($db->escape($adm_info->father_phone))."',
+									mother_first_name='".trim($db->escape($adm_info->mother_first_name))."',
+									mother_last_name='".trim($db->escape($adm_info->mother_last_name))."',
+									mother_area_code='".trim($db->escape($adm_info->mother_area_code))."',
+									mother_phone='".trim($db->escape($adm_info->mother_phone))."',
+									primary_email='".trim($db->escape($adm_info->primary_email))."',
+									forte_customer_token='".trim($db->escape($adm_info->forte_customer_token))."',
+									forte_payment_token='".trim($db->escape($adm_info->forte_payment_token))."',
+									secondary_email='".trim($db->escape($adm_info->secondary_email))."',
+									billing_address_1='".trim($db->escape($adm_info->address_1))."',
+									billing_address_2='".trim($db->escape($adm_info->address_2))."',
+									billing_city='".trim($db->escape($adm_info->city))."',
+									billing_post_code='".trim($db->escape($adm_info->post_code))."',
+									billing_entered_state='".trim($db->escape($adm_info->state))."',
+									billing_country_id='1',addition_notes='".trim($db->escape($adm_info->addition_notes))."',
+									payment_method='".trim($db->escape($adm_info->payment_method))."',is_deleted='0',
+									created_by_user_id='".$_SESSION['icksumm_uat_login_userid']."', created_on='".date('Y-m-d H:i:s')."'";
+									
+									$family_res = $db->query($sql);
+									$family_id = $db->insert_id;
+								}else{
+									$family_id = 0; 
+								}
+							}
+							
+							if($parents_user_id > 0 && $family_id > 0){ 
+
+								//GET USER TYPE ID FOR PARENTS (UT05 FOR  PARENTS)
+								$parentsUserTypeId = $db->get_var("select id from ss_usertype where user_type_code='UT05'");
+								
+								//ADDED ON 16-AUG-2018 - INSERT/ASSIGN 'PARENTS' ROLE TO PARENTS USER 
+								$usertype_added = $db->query("insert into ss_usertypeusermap set user_id='".$parents_user_id."', user_type_id = '".$parentsUserTypeId."', created_by_user_id = '".$_SESSION['icksumm_uat_login_userid']."', created_on = '".date('Y-m-d H:i')."'");
+								
+								//SET FAMILY ID IN STUDENT TABLE
+								$sql_ret = $db->query("update ss_student set family_id='".$family_id."' where user_id='".$user_id."'");
+								
+								if($usertype_added && $sql_ret){ 
+									$payment_res = $db->get_row("select * from ss_paymentcredentials where family_id='".$family_id."'");
+									
+									if(!count($payment_res)){ 
+										//ENTRY IN PAYMENT TABLE
+										$adreq_pay = $db->get_row("select * from ss_sunday_sch_payment where sunday_sch_req_id='".$reqno."'");
+									
+										$payment_res = $db->query("insert into ss_paymentcredentials set sunday_sch_req_id='".$reqno."',
+										family_id='".$family_id."',
+										credit_card_type='".$adreq_pay->credit_card_type."', credit_card_no='".$adreq_pay->credit_card_no."', 
+										credit_card_exp='".$adreq_pay->credit_card_exp."', forte_payment_token='".trim($db->escape($adreq_pay->forte_payment_token))."', default_credit_card = 1,  postal_code='".$adreq_pay->postal_code."', 
+										bank_acc_no='".$adreq_pay->bank_acc_no."', routing_no='".$adreq_pay->routing_no."', 
+										check_image='".$adreq_pay->check_image."', 
+										created_by_user_id='".$_SESSION['icksumm_uat_login_userid']."', created_on='".date('Y-m-d H:i:s')."'");		
+										
+										if($payment_res){
+											$paymentInfoExist = true;
+										}else{
+											$paymentInfoExist = false; 
+										}
+
+									}else{
+										$paymentInfoExist = true;
+									}
+									
+									if($paymentInfoExist){ 
+
+										//ASSIGN GROUP 
+										$grp_upd = $db->query("insert into ss_studentgroupmap set student_user_id='".$user_id."', group_id='".$group_id."', latest=1, created_by_user_id='".$_SESSION['icksumm_uat_login_userid']."', 
+										created_on='".date('Y-m-d H:i:s')."'");
+									
+										if($grp_upd > 0) { 
+
+											//SET USER ID IN ADMISSION REQUEST TABLE
+											$sql_ret = $db->query("update ss_sunday_sch_req_child set user_id='".$user_id."', is_executed=1 where id='".$childno."'");
+											
+											if($sql_ret && $db->query('COMMIT') !== false){
+
+												//SEND LOGIN DETAILS TO PARENTS
+												$emailbody_parents = "Dear Parents Assalamualaikum,<br><br>Congratulations! Group <strong>".$group_name."</strong> is allotted to your child ".$first_name." ".$last_name.". You can login in Summer Camp school parent's section using below information:";
+												
+												$emailbody_parents .= "<br><br><strong>Login URL:</strong> ".SITEURL."login.php";
+												$emailbody_parents .= "<br><strong>Email:</strong> ".trim($adm_info->primary_email);
+												
+												if($is_family_exists_in_db == false){
+													$emailbody_parents .= "<br><strong>Password:</strong> ".$parentsPassword;
+												}else{
+													$emailbody_parents .= "<br><strong>Password:</strong> Please use password provided earlier";
+												}
+												
+												$emailbody_parents .= "<br><br>Summer Camp School Team";											
+												send_my_mail(trim($adm_info->primary_email), 'Summer Camp School Account Details', $emailbody_parents);
+												
+												echo json_encode(array('code' => "1",'msg' => 'Student added in active list successfully',
+												'user_id'=>$user_id));
+												exit;
+											}else{
+												$db->query('ROLLBACK');
+												echo json_encode(array('code' => "0",'msg' => 'Error: Process failed','_errpos' => '7'));
+												exit;
+											}
+										}else{
+											$db->query('ROLLBACK');
+											echo json_encode(array('code' => "0",'msg' => 'Error: Process failed','_errpos' => '1'));
+											exit;
+										}
+									}else{ 
+										$db->query('ROLLBACK');
+										echo json_encode(array('code' => "0",'msg' => 'Error: Process failed','_errpos' => '9'));
+										exit;
+									}
+								}else{
+									$db->query('ROLLBACK');
+									echo json_encode(array('code' => "0",'msg' => 'Error: Process failed','_errpos' => '2'));
+									exit;
+								}
+							}else{
+								$db->query('ROLLBACK');
+								echo json_encode(array('code' => "0",'msg' => 'Error: Process failed','_errpos' => '3'));
+								exit;
+							}
+						}else{
+							$db->query('ROLLBACK');
+							echo json_encode(array('code' => "0",'msg' => 'Error: Process failed','_errpos' => '4'));
+							exit;
+						}
+					}else{
+						$db->query('ROLLBACK');
+						echo json_encode(array('code' => "0",'msg' => 'Error: Process failed','_errpos' => '5'));
+						exit;
+					}
+				}else{
+					$db->query('ROLLBACK');
+					echo json_encode(array('code' => "0",'msg' => 'Error: Process failed','_errpos' => '6'));
+					exit;
+				}
+			}else{
+				$db->query('ROLLBACK');
+				echo json_encode(array('code' => "0",'msg' => 'Error: Student already added','_errpos' => '8'));
+				exit;
+			}
+		}else{
+			$db->query('ROLLBACK');
+			echo json_encode(array('code' => "0",'msg' => 'Error: Group has reached maximum limit','_errpos' => '10'));
+			exit;
+		}
+	}
+
+// Multiple Group 
+	elseif ($get_general_info == 0) {
+        	//$group_id = $_POST['group_id'];
+	        $reqno = $_POST['reqno'];
+	        $childno = $_POST['childno'];
+	        $db->query('BEGIN');
+	        $classes = $_POST['class'];
+	        $totalClass_count = count($classes);
+	        $queryCount = 0;
+	        foreach ($classes as $class_id) {
+	            $group_id = $_POST["group_id" . $class_id];
+	            $group_details = $db->get_row("select * from ss_groups where id = '" . $group_id . "'");
+	            $groupMaxLimit = $group_details->max_limit;
+	            $group_name = $group_details->group_name;
+	            //$groupCurStrength = $db->get_var("select count(1) from ss_studentgroupmap where group_id = '" . $group_id . "' and latest = 1");
+	            $groupCurStrength = $db->get_results("select * from ss_studentgroupmap where group_id = '".$group_id."' and latest = 1 group by student_user_id");
+
+
+	            if (count($groupCurStrength) < $groupMaxLimit) {
+	                $queryCount = $queryCount + 1;
+	            } else {
+	                $db->query('ROLLBACK');
+	                echo json_encode(array('code' => "0", 'msg' => 'Error: ' . $group_name . ' Group has reached maximum limit', '_errpos' => '10'));
+	                exit;
+	            }
+	        }
+	        if ($totalClass_count == $queryCount) {
+	            $child_user_id = 0;
+	            $child_user_id = $db->get_var("select user_id from ss_sunday_sch_req_child where id='" . $childno . "'");
+	            if (trim($child_user_id) == '') {
+	                $adm_info = $db->get_row("select * from ss_sunday_school_reg where id='" . $reqno . "'");
+	                $child_info = $db->get_row("select * from ss_sunday_sch_req_child where id='" . $childno . "'");
+	                $newUsername = generateUsername($child_info->first_name, $child_info->last_name, $child_info->dob);
+	                $first_name = trim($db->escape($child_info->first_name));
+	                $last_name = trim($db->escape($child_info->last_name));
+	                $dob = trim($db->escape($child_info->dob));
+	                $gender = trim($db->escape($child_info->gender));
+	                $school_grade = trim($db->escape($child_info->school_grade));
+	                $allergies = trim($db->escape($child_info->allergies));
+	                $qur_sch_stu_user_id = $child_info->qur_sch_stu_user_id;
+	                if (trim($qur_sch_stu_user_id) == '') {
+	                    $qur_sch_stu_user_id = "NULL";
+	                }
+	                $newPassword = generatePassword();
+	                //GET USER TYPE ID FOR STUDENT (UT03 FOR  STUDENT)
+	                $userTypeId = $db->get_var("select id from ss_usertype where user_type_code='UT03'");
+	                if ($newUsername != '') {
+	                    //ENTRY INTO USER TABLE
+	                    $db->query("insert into ss_user set username='" . $newUsername . "', password='" . md5($newPassword) . "', email='" . trim($db->escape($adm_info->primary_email)) . "', user_type_id='" . $userTypeId . "', is_email_verified=0, is_locked=0, is_active=1, session='" . $_SESSION['icksumm_uat_CURRENT_SESSION'] . "', created_on='" . date('Y-m-d H:i:s') . "'");
+	                    $user_id = $db->insert_id;
+	                    if ($user_id > 0) {
+	                        //GET USER TYPE ID FOR STUDENT (UT03 FOR  STUDENT)
+	                        $studentUserTypeId = $db->get_var("select id from ss_usertype where user_type_code='UT03'");
+	                        //ADDED ON 19-AUG-2018 - INSERT/ASSIGN 'STUDENT' ROLE TO STUDENT USER
+	                        $stu_usertype_added = $db->query("insert into ss_usertypeusermap set user_id='" . $user_id . "', 
+						user_type_id = '" . $studentUserTypeId . "', created_by_user_id = '" . $_SESSION['icksumm_uat_login_userid'] . "', 
+						created_on = '" . date('Y-m-d H:i') . "'");
+	                        //ENTRY IN STUDENT TABLE
+	                        $student_res = $db->query("insert into ss_student set user_id='" . $user_id . "', admission_date='" . date('Y-m-d') . "', first_name='" . $first_name . "', last_name='" . $last_name . "', dob='" . $dob . "', allergies='" . $allergies . "', school_grade='" . $school_grade . "', gender='" . $gender . "', 
+						qur_sch_stu_user_id = " . $qur_sch_stu_user_id . ",
+						created_by_user_id='" . $_SESSION['icksumm_uat_login_userid'] . "', created_on='" . date('Y-m-d H:i:s') . "'");
+	                    
+	                        if ($stu_usertype_added && $student_res) {
+	                            //CHECK IF FAMILY EXISTS
+	                            $familyInfo = $db->get_row("select * from ss_family where primary_email='" . $db->escape(trim($adm_info->primary_email)) . "'");
+	                            $parentsPassword = generatePassword();
+	                            $userEmailCheck = $db->get_var("select count(*) from ss_user where username='" . trim($adm_info->primary_email) . "'");
+	                            //SEND LOGIN DETAILS TO PARENTS
+	                            $emailbody_parents.= "Dear Parents Assalamualaikum,<br><br>
+							  JazakAllah Khairan for enrolling <strong>" . $first_name . " " . $last_name . "</strong>. to Summer Camp school. <strong>" . $first_name . " " . $last_name . "'s</strong> levels are stated below. You can also login to Summer Camp school parent's portal using below information:";
+	                            $emailbody_parents.= "<br><br><strong>Login URL:</strong> " . SITEURL . "login.php";
+	                            $emailbody_parents.= "<br><strong>Email/Username:</strong> " . trim($adm_info->primary_email);
+	                            if ($userEmailCheck == 0) {
+	                                $emailbody_parents.= "<br><strong>Password:</strong> " . $parentsPassword;
+	                            } else {
+	                                $emailbody_parents.= "<br><strong>Password:</strong> Please use your current ".CENTER_SHORTNAME." ".SCHOOL_NAME." password";
+	                            }
+	                            if (count($familyInfo)) {
+	                                $parents_user_id = $familyInfo->user_id;
+	                                $family_id = $familyInfo->id;
+	                                $is_family_exists_in_db = true;
+	                            } else {
+	                                $is_family_exists_in_db = false;
+	                                //GET USER TYPE ID FOR PARENTS (UT05 FOR  PARENTS)
+	                                $parentsUserTypeId = $db->get_var("select id from ss_usertype where user_type_code='UT05'");
+	                                //ADDED ON 16-AUG-2018 - CHECK IF ACCOUNT EXITS WITH ENTERED EMAIL
+	                                $emailCheck = $db->get_row("select * from ss_user where username='" . trim($adm_info->primary_email) . "'");
+	                                if ($emailCheck) {
+	                                    //ADDED ON 16-AUG-2018
+	                                    $parents_user_id = $emailCheck->id;
+	                                } else {
+	                                    //COMMENTED ON 16-AUG-2018
+	                                    //$db->query("insert into ss_user set username='".$db->escape(trim($adm_info->primary_email))."', password='".md5($parentsPassword)."', email='".trim($db->escape($adm_info->primary_email))."', user_type_id='".$parentsUserTypeId."', is_email_verified=1, is_locked=0, is_active=1, created_on='".date('Y-m-d H:i:s')."'");
+	                                    //ADDED ON 16-AUG-2018
+	                                    $db->query("insert into ss_user set username='" . $db->escape(trim($adm_info->primary_email)) . "', password='" . md5($parentsPassword) . "', email='" . trim($db->escape($adm_info->primary_email)) . "', is_email_verified=1, is_locked=0, is_active=1, created_on='" . date('Y-m-d H:i:s') . "'");
+	                                    $parents_user_id = $db->insert_id;
+	                                }
+	                                $check_role = $db->get_row("select * from ss_user_role_map where user_id='" . $parents_user_id . "' and role_id=4 and status=1");
+	                                if (empty($check_role)) {
+	                                    $db->query("insert into ss_user_role_map set user_id='" . $parents_user_id . "', role_id=4, status=1 ");
+	                                }
+	                                if ($parents_user_id > 0) {
+	                                    //ENTRY IN FAMILY TABLE
+	                                    $sql = "insert into ss_family set login_pin='" . rand(1000, 9999) . "',
+									user_id='" . $parents_user_id . "', 
+									father_first_name='" . trim($db->escape($adm_info->father_first_name)) . "',
+									father_last_name='" . trim($db->escape($adm_info->father_last_name)) . "',
+									father_area_code='" . trim($db->escape($adm_info->father_area_code)) . "',
+									father_phone='" . trim($db->escape($adm_info->father_phone)) . "',
+									mother_first_name='" . trim($db->escape($adm_info->mother_first_name)) . "',
+									mother_last_name='" . trim($db->escape($adm_info->mother_last_name)) . "',
+									mother_area_code='" . trim($db->escape($adm_info->mother_area_code)) . "',
+									mother_phone='" . trim($db->escape($adm_info->mother_phone)) . "',
+									primary_email='" . trim($db->escape($adm_info->father_email)) . "',
+									secondary_email='" . trim($db->escape($adm_info->mother_email)) . "',
+									primary_contact='" . trim($db->escape($adm_info->primary_contact)) . "',
+									billing_address_1='" . trim($db->escape($adm_info->address_1)) . "',
+									billing_address_2='" . trim($db->escape($adm_info->address_2)) . "',
+									billing_city='" . trim($db->escape($adm_info->city)) . "',
+									billing_post_code='" . trim($db->escape($adm_info->post_code)) . "',
+									billing_state_id='" . trim($db->escape($adm_info->state)) . "',
+									billing_country_id='1',addition_notes='" . trim($db->escape($adm_info->addition_notes)) . "',
+									payment_method='" . trim($db->escape($adm_info->payment_method)) . "',
+									forte_customer_token='" . trim($db->escape($adm_info->forte_customer_token)) . "',
+									is_deleted='0',
+									created_by_user_id='" . $_SESSION['icksumm_uat_login_userid'] . "', created_on='" . date('Y-m-d H:i:s') . "'";
+	                                    $family_res = $db->query($sql);
+	                                    $family_id = $db->insert_id;
+	                                } else {
+	                                    $family_id = 0;
+	                                }
+	                            }
+	                            if ($parents_user_id > 0 && $family_id > 0) {
+	                                //GET USER TYPE ID FOR PARENTS (UT05 FOR  PARENTS)
+	                                $parentsUserTypeId = $db->get_var("select id from ss_usertype where user_type_code='UT05'");
+	                                //ADDED ON 16-AUG-2018 - INSERT/ASSIGN 'PARENTS' ROLE TO PARENTS USER
+	                                $usertype_added = $db->query("insert into ss_usertypeusermap set user_id='" . $parents_user_id . "', user_type_id = '" . $parentsUserTypeId . "', created_by_user_id = '" . $_SESSION['icksumm_uat_login_userid'] . "', created_on = '" . date('Y-m-d H:i') . "'");
+	                                //SET FAMILY ID IN STUDENT TABLE
+	                                $sql_ret = $db->query("update ss_student set family_id='" . $family_id . "' where user_id='" . $user_id . "'");
+	                                if ($usertype_added && $sql_ret) {
+	                                    $payment_res = $db->get_row("select * from ss_paymentcredentials where family_id='" . $family_id . "'");
+	                                    $adreq_pay = $db->get_row("select * from ss_sunday_sch_payment where sunday_sch_req_id='" . $reqno . "'");
+	                                    if (!count($payment_res) && !empty($adreq_pay->credit_card_no) && !empty($adreq_pay->credit_card_exp)) {
+	                                        //ENTRY IN PAYMENT TABLE
+	                                        $payment_res = $db->query("insert into ss_paymentcredentials set sunday_sch_req_id='" . $reqno . "',
+										family_id='" . $family_id . "',
+										credit_card_type='" . $adreq_pay->credit_card_type . "', credit_card_no='" . $adreq_pay->credit_card_no . "', 
+										credit_card_exp='" . $adreq_pay->credit_card_exp . "', postal_code='" . $adreq_pay->postal_code . "', 
+										bank_acc_no='" . $adreq_pay->bank_acc_no . "', credit_card_cvv='" . $adreq_pay->credit_card_cvv . "',
+										default_credit_card=1,
+										forte_payment_token='" . $adreq_pay->forte_payment_token . "',
+										check_image='" . $adreq_pay->check_image . "', 
+										created_by_user_id='" . $_SESSION['icksumm_uat_login_userid'] . "', created_on='" . date('Y-m-d H:i:s') . "'");
+	                                        if ($payment_res) {
+	                                            $paymentInfoExist = true;
+	                                        } else {
+	                                            $paymentInfoExist = false;
+	                                        }
+	                                    } else {
+	                                        $paymentInfoExist = true;
+	                                    }
+	                                    if ($paymentInfoExist) {
+	                                        //ASSIGN GROUP
+	                                        foreach ($classes as $class_id) {
+	                                            $group_id = $_POST["group_id" . $class_id];
+	                                            $grp_upd = $db->query("insert into ss_studentgroupmap set student_user_id='" . $user_id . "', 
+										group_id='" . $group_id . "', class_id = '" . $class_id . "', latest=1, created_by_user_id = '" . $_SESSION['icksumm_uat_login_userid'] . "', 
+										created_on='" . date('Y-m-d H:i:s') . "', updated_by_user_id = '" . $_SESSION['icksumm_uat_login_userid'] . "', 
+										updated_on='" . date('Y-m-d H:i:s') . "'");
+	                                        }
+	                                        if ($grp_upd > 0) {
+	                                            //SET USER ID IN ADMISSION REQUEST TABLE
+	                                            $sql_ret = $db->query("update ss_sunday_sch_req_child set user_id='" . $user_id . "', is_executed=1 where id='" . $childno . "'");
+	                                            //SEND LOGIN DETAILS TO PARENTS
+	                                            $stugroupclass = $db->get_results("select g.group_name,s.class_name from ss_groups g inner join ss_studentgroupmap m on g.id = m.group_id inner join  ss_classes s on m.class_id = s.id where m.latest = 1 and m.student_user_id='" . $user_id . "' order by m.id desc");
+	                                            $emailbody_parents.= '<br><br><table style="border:0" width="100%" cellspacing="0" cellpadding="3"><tbody><tr style="border:solid 1px #999;background: #dfdfdf;font-weight: bold;"><td style="border:solid 1px #999;background: #dfdfdf;font-weight: bold;"><strong>CLASS</th><th style="border:solid 1px #999;background: #dfdfdf;font-weight: bold;">GROUP</th></tr>';
+	                                            foreach ($stugroupclass as $row) {
+	                                                $emailbody_parents.= '<tr style="border:solid 1px #999">';
+	                                                $emailbody_parents.= '<td style="border:solid 1px #999">
+														' . $row->class_name . '</td><td style="border:solid 1px #999">' . $row->group_name . '</td>';
+	                                                $emailbody_parents.= '</tr>';
+	                                            }
+	                                            $emailbody_parents.= '<tbody></table>';
+	                                            $emailbody_parents.= "<br><strong>Login Instructions for Parents</strong><ul style='padding: 0 10px;'><li>Select School</li><li>Enter your registered email</li><li>Enter password (Password field is case sensitive)</li></ul>";
+	                                            $emailbody_parents.= "<br><br>".CENTER_SHORTNAME." ".SCHOOL_NAME." Team";
+	                                            //REMOVE NEW LINE CHARACTERS
+	                                            $emailbody_parents = str_replace("\n", "", $emailbody_parents);
+	                                            $emailbody_parents = str_replace("\r", "", $emailbody_parents);
+	                                            if ($sql_ret && $db->query('COMMIT') !== false) {
+	                                                send_my_mail('moh.urooj@gmail.com', 'Saturday Academy Account Details', $emailbody_parents);
+	                                                send_my_mail(trim($adm_info->primary_email), 'Saturday Academy Account Details', $emailbody_parents);
+	                                                if (trim($adm_info->secondary_email) != "") {
+	                                                    send_my_mail(trim($adm_info->secondary_email), 'Saturday Academy Account Details', $emailbody_parents);
+	                                                }
+	                                                echo json_encode(array('code' => "1", 'msg' => 'Student added in active list successfully', 'user_id' => $user_id));
+	                                                exit;
+	                                            } else {
+	                                                $db->query('ROLLBACK');
+	                                                echo json_encode(array('code' => "0", 'msg' => 'Error: Process failed', '_errpos' => '7'));
+	                                                exit;
+	                                            }
+	                                        } else {
+	                                            $db->query('ROLLBACK');
+	                                            echo json_encode(array('code' => "0", 'msg' => 'Error: Process failed', '_errpos' => '1'));
+	                                            exit;
+	                                        }
+	                                    } else {
+	                                        $db->query('ROLLBACK');
+	                                        echo json_encode(array('code' => "0", 'msg' => 'Error: Process failed', '_errpos' => '9'));
+	                                        exit;
+	                                    }
+	                                } else {
+	                                    $db->query('ROLLBACK');
+	                                    echo json_encode(array('code' => "0", 'msg' => 'Error: Process failed', '_errpos' => '2'));
+	                                    exit;
+	                                }
+	                            } else {
+	                                $db->query('ROLLBACK');
+	                                echo json_encode(array('code' => "0", 'msg' => 'Error: Process failed', '_errpos' => '3'));
+	                                exit;
+	                            }
+	                        } else {
+	                            $db->query('ROLLBACK');
+	                            echo json_encode(array('code' => "0", 'msg' => 'Error: Process failed', '_errpos' => '4'));
+	                            exit;
+	                        }
+	                    } else {
+	                        $db->query('ROLLBACK');
+	                        echo json_encode(array('code' => "0", 'msg' => 'Error: Process failed', '_errpos' => '5'));
+	                        exit;
+	                    }
+	                } else {
+	                    $db->query('ROLLBACK');
+	                    echo json_encode(array('code' => "0", 'msg' => 'Error: Process failed', '_errpos' => '6'));
+	                    exit;
+	                }
+	            } else {
+	                $db->query('ROLLBACK');
+	                echo json_encode(array('code' => "0", 'msg' => 'Error: Student already added', '_errpos' => '8'));
+	                exit;
+	            }
+	        } else {
+	            $db->query('ROLLBACK');
+	            echo json_encode(array('code' => "0", 'msg' => 'Error: Group has reached maximum limit', '_errpos' => '10'));
+	            exit;
+	        }
+	}
+	
+}
+
+// //====================SET INTERVIEW DATE========================
+ elseif($_POST['action'] == 'schedule_interview'){
+	$req_no = $_POST['sch_int_reqno'];
+	$child_no = $_POST['sch_int_childno'];
+	$interview_date = date('Y-m-d',strtotime($_POST['interview_date']));
+	
+	$res = $db->query("update ss_sunday_sch_req_child set interview_date='".$interview_date."',updated_on='".time()."' where id='".$child_no."'");
+
+	if($res > 0) {
+		echo json_encode(array('code' => "1",'msg' => 'Interview scheduled successfully'));
+		exit;
+	}else{
+		echo json_encode(array('code' => "0",'msg' => 'Error: Interview not scheduled'));
+		exit;
+	}
+}
+
+// //==========================VIEW CHILD DETAILS===================
+elseif($_POST['action'] == 'view_child_detail'){
+	$id = $_POST['reqno'];
+	$childno = $_POST['childno'];
+	
+	// $req_info = $db->get_row("select * from ss_sunday_school_reg where id = '".$reqno."'");
+	
+	// $child = $db->get_row("SELECT * from ss_sunday_sch_req_child where id = '".$childno."'");
+	 $family = $db->get_row("select ss_sunday_school_reg.* from ss_sunday_school_reg where id='" . $id . "'");
+        if ($family->primary_contact == 'Father') {
+            $primary_contact = '1st Parent';
+        } else {
+            $primary_contact = '2nd Parent';
+        }
+        $students = $db->get_results("SELECT ch.user_id, ch.dob, ch.allergies, ch.school_grade, CONCAT(ch.first_name,' ',COALESCE(ch.last_name, '')) AS student_name, reg.amount_received FROM ss_sunday_sch_req_child ch INNER JOIN ss_sunday_school_reg reg ON reg.id = ch.sunday_school_reg_id  WHERE ch.sunday_school_reg_id = '" . $id . "' AND ch.id = '".$childno."' ");
+     
+      $check = $db->get_row("select is_new_registration_open, is_new_registration_free, new_registration_fees_form_head, new_registration_fees from ss_client_settings where status = 1");
+       $ramount = round($check->new_registration_fees, 0);
+     
+
+        foreach ($students as $stu) {
+        	$final_amount_all =	$stu->amount_received;
+        }
+        $retStr.= '<legend class="text-semibold">Registration Payment Information</legend>
+        			<div class="row viewonly">';
+	
+		if($check->new_registration_fees_form_head == 0 && $check->is_new_registration_free == 0){
+		$retStr.= '<div class="col-md-2">
+				<label>Registration Fees (Per Form) :</label> $' . ($ramount) . '
+				</div>';
+		}elseif($check->new_registration_fees_form_head == 1 && $check->is_new_registration_free == 0){
+		$retStr.= '<div class="col-md-5">
+				<label>Registration Fees (Per Head) : </label>$' . ($ramount) . '
+				</div>';
+		$retStr.= '<div class="col-md-5">
+				<label>Total Fees : </label>$' . ($final_amount_all + 0) . '
+				</div>
+				</div>';
+		}
+
+	$paymentcred = $db->get_row("select * from ss_sunday_sch_payment where sunday_sch_req_id='" . $id . "'");
+ 	$credit_card_no = str_replace(' ', '', base64_decode($paymentcred->credit_card_no));
+ 	$credit_card_exp = base64_decode($paymentcred->credit_card_exp);
+    $credit_card_cvv = base64_decode($paymentcred->credit_card_cvv);
+    $credit_card_expAry = explode('-', $credit_card_exp);
+    $credit_card_exp_month = $credit_card_expAry[0];
+    $credit_card_exp_year = $credit_card_expAry[1];
+		$retStr.= '<div class="row viewonly">
+					<div class="col-md-5">
+						<label>Last 4 digits of credit card :</label> ************ ' . substr($credit_card_no, -4) . '
+					</div>
+					<div class="col-md-4">
+						<label>Expiry Date :</label> ' . $credit_card_exp_month . '/' . $credit_card_exp_year . '
+					</div>
+					<div class="col-md-3">
+					</div>
+					</div>';
+        $retStr.= '<legend class="text-semibold">Child Information</legend>';
+        $i = 1;
+        foreach ($students as $stu) {
+            $dob = date('Y-m-d', strtotime($stu->dob));
+            $from = new DateTime($dob);
+            $to = new DateTime('today');
+            $stu_age = $from->diff($to)->y;
+            $age = $stu_age . ' Yrs';
+            $group = $db->get_row("select g.group_name,s.class_name from ss_groups g inner join ss_studentgroupmap m on g.id = m.group_id inner join  ss_classes s on m.class_id = s.id where m.latest = 1 and m.student_user_id='" . $stu->user_id . "'");
+           
+            
+            $retStr.= '<div class="row viewonly">';
+            $retStr.= '<div class="col-md-4">
+            			<label>Child ' . $i . ': </label> ' . $stu->student_name . '</div> 
+            		   <div class="col-md-3">
+            		   <label>Grade:</label> ' . $stu->school_grade . '</div>
+            		   <div class="col-md-4">
+            			<label>Class Session Time: </label> ' . $family->class_session . '</div>';
+
+            $retStr.= '</div>';
+            $retStr.= '<div class="row viewonly">
+					<div class="col-md-4"> 
+					<label>Date of Birth: </label>' . date('m/d/Y', strtotime($stu->dob)) . '
+					</div>
+					<div class="col-md-3">
+					<label>Age:</label>' . $age . '
+					</div>';
+            if (!empty($stu->allergies)) {
+                $retStr.= '<div class="col-md-4"><label>Allergies:</label> ' . $stu->allergies . ' </div>';
+            }
+            $retStr.= '</div>';
+            $i++;
+        }
+        $retStr.= '<legend class="text-semibold">Parent Information</legend>
+					<div class="row viewonly">
+					<div class="col-md-4">
+					<label>1st Parent Name:</label>' . $family->father_first_name . ' ' . $family->father_last_name . '
+					</div>
+					<div class="col-md-3">
+					<label>Phone:</label>' . $family->father_phone . '
+					</div>
+					<div class="col-md-5">
+					<label>Email:</label>' . $family->primary_email . '
+					</div>
+					</div>';
+        if (!empty($family->mother_first_name)) {
+            $retStr.= '<div class="row viewonly">
+					<div class="col-md-4">
+					<label>2nd Parent Name:</label>' . $family->mother_first_name . ' ' . $family->mother_last_name . '
+					</div>
+					<div class="col-md-3">
+					<label>Phone:</label>' . $family->mother_phone . '
+					</div>
+					<div class="col-md-5">
+					<label>Email:</label>' . $family->secondary_email . '
+					</div>
+					</div>';
+        }
+        $retStr.= '<div class="row viewonly">
+					<div class="col-md-4 col-md-6">
+					<label>Primary Contact:</label>' . $primary_contact . '
+					</div>
+					</div>';
+        $billing_state = $db->get_var("select state from ss_state where id = '" . $family->state . "'");
+        $retStr.= '<div class="row viewonly"><div class="col-md-12"><label>Address:</label>' . $family->address_1 . ', ' . $family->address_2 . ', ' . $family->city . ', ' . (trim($billing_state) != '' ? $billing_state : $family->state) . ', ' . $family->post_code . '</div></div>';
+        $retStr.= '<div class="row viewonly"><div class="col-md-12"><label>Additional Noted:</label>' . $family->addition_notes . '</div></div>';
+        
+        echo $retStr;
+        exit;
+}
+?>

@@ -1,0 +1,1 @@
+ALTER TABLE `ss_role` ADD `access` TINYINT(4) NOT NULL DEFAULT '0' AFTER `status`; 
