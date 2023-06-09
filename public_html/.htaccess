@@ -3,13 +3,13 @@ RewriteBase /
 
 RewriteEngine On
 
-ErrorDocument 404 https://ick.bayyan.org/school_uat/404.php
+ErrorDocument 404 https://localhost:8091/404.php
 
 #TO STOP DIRECTORY INDEXING
 Options -Indexes 
 
 #TO ALLOW BAYYAN MAIL SERVICE TO ACCESS MESSAGE ATTACHMENT
-Header Set Access-Control-Allow-Origin "https://mailservice.bayyan.org"
+#Header Set Access-Control-Allow-Origin "https://mailservice.bayyan.org"
 #Header Set Access-Control-Allow-Origin "https://uatsecurepay.bayyan.org" 
 
 #REMOVE PHP EXTENSION - PART - 1
