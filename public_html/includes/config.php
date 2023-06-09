@@ -23,7 +23,7 @@ require_once("ezSQL/ez_sql_mysqli.php");
 
 //Credentials
 $db_host = "127.0.0.1";
-$db_name = 'New';
+$db_name = 'isgkc';
 $db_user = 'root';
 $db_pswd = ''; 
 
